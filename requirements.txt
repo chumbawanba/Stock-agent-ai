@@ -1,5 +1,6 @@
 langchain
-langchain-community
+openai
 yfinance
 pandas
 ta
+python-dotenv
