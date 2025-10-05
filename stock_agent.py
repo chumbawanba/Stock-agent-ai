@@ -5,13 +5,14 @@ from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import os
 
-# ------------------ Email settings ------------------
-SMTP_SERVER = "smtp.gmail.com"  # Example: Gmail SMTP
+# ------------------ Email settings from GitHub Secrets ------------------
+EMAIL_USER = os.environ.get("EMAIL_USER")
+EMAIL_PASS = os.environ.get("EMAIL_PASS")
+EMAIL_TO = os.environ.get("EMAIL_TO")
+SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-EMAIL_USER = "your_email@gmail.com"
-EMAIL_PASS = "your_app_password"  # Use App Password, not your main Gmail password
-EMAIL_TO = "recipient_email@gmail.com"
 
 # ------------------ Stock rules function ------------------
 def check_stock(ticker: str):
@@ -19,20 +20,24 @@ def check_stock(ticker: str):
     if df.empty:
         return f"{ticker}: No data found.", None
 
+    # Flatten Close column in case it's 2D
     close_series = df["Close"]
     if isinstance(close_series, pd.DataFrame):
-        close_series = close_series.squeeze()  # Flatten 2D to 1D
+        close_series = close_series.squeeze()
 
     df["rsi"] = RSIIndicator(close_series).rsi()
     df["ma50"] = df["Close"].rolling(window=50).mean()
     df["ma200"] = df["Close"].rolling(window=200).mean()
 
     latest = df.iloc[-1]
-    rsi = latest["rsi"]
-    close = latest["Close"]
-    ma50 = latest["ma50"]
-    ma200 = latest["ma200"]
 
+    # Convert Series to scalar
+    rsi = latest["rsi"].item() if hasattr(latest["rsi"], "item") else latest["rsi"]
+    close = latest["Close"].item() if hasattr(latest["Close"], "item") else latest["Close"]
+    ma50 = latest["ma50"].item() if hasattr(latest["ma50"], "item") else latest["ma50"]
+    ma200 = latest["ma200"].item() if hasattr(latest["ma200"], "item") else latest["ma200"]
+
+    # Apply rules
     if rsi < 30 and close > ma50:
         decision = "BUY"
     elif rsi > 70 or close < ma200:
@@ -41,11 +46,17 @@ def check_stock(ticker: str):
         decision = "HOLD"
 
     text = f"{ticker}: {decision} (RSI={rsi:.2f}, Price={close:.2f})"
-    data = {"Ticker": ticker, "Decision": decision, "RSI": rsi, "Price": close,
-            "MA50": ma50, "MA200": ma200, "Date": datetime.today().strftime("%Y-%m-%d")}
+    data = {
+        "Ticker": ticker,
+        "Decision": decision,
+        "RSI": round(rsi, 2),
+        "Price": round(close, 2),
+        "MA50": round(ma50, 2),
+        "MA200": round(ma200, 2),
+        "Date": datetime.today().strftime("%Y-%m-%d")
+    }
 
     return text, data
-
 
 # ------------------ List of tickers ------------------
 tickers = ["AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"]
@@ -66,24 +77,25 @@ df_results = pd.DataFrame(results)
 df_results.to_csv("stock_report.csv", index=False)
 
 # ------------------ Send email if needed ------------------
-if messages_to_send:
+if messages_to_send and EMAIL_USER and EMAIL_PASS and EMAIL_TO:
     subject = "Stock Action Alert"
     body = "The following stocks have BUY/SELL signals:\n\n" + "\n".join(messages_to_send)
-    
+
     msg = MIMEMultipart()
     msg["From"] = EMAIL_USER
     msg["To"] = EMAIL_TO
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
-    
+
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASS)
         server.send_message(msg)
-    
+
     print("Email sent!")
 else:
-    print("No action needed today.")
+    print("No action needed today or email settings missing.")
+
 
 
 
