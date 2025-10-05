@@ -7,12 +7,16 @@ from ta.momentum import RSIIndicator
 # Tool logic
 def check_stock(ticker: str) -> str:
     df = yf.download(ticker, period="6mo", interval="1d", auto_adjust=True)
-
     if df.empty:
         return f"{ticker}: No data found."
 
-    # Calculate RSI correctly
-    df["rsi"] = RSIIndicator(df["Close"]).rsi().squeeze()
+    # Ensure Close is 1D
+    close_series = df["Close"]
+    if isinstance(close_series, pd.DataFrame):
+        close_series = close_series.iloc[:, 0]
+
+    # Calculate RSI
+    df["rsi"] = RSIIndicator(close_series).rsi()
 
     # Moving averages
     df["ma50"] = df["Close"].rolling(window=50).mean()
@@ -27,6 +31,7 @@ def check_stock(ticker: str) -> str:
         decision = "SELL"
 
     return f"{ticker}: {decision} (RSI={latest['rsi']:.2f}, Price={latest['Close']:.2f})"
+
 
 
 # Tool setup
