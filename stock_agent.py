@@ -45,9 +45,9 @@ tools = [
 # Using a CPU-friendly model
 pipe = pipeline(
     "text-generation",
-    model="tiiuae/falcon-7b-instruct",  # public Hugging Face model
+    model="google/flan-t5-small",  # ~80 MB
     max_new_tokens=128,
-    device=-1  # CPU
+    device=-1
 )
 llm = HuggingFacePipeline(pipeline=pipe)
 
