@@ -1,6 +1,6 @@
 from langchain.tools import tool
 from langchain.agents import initialize_agent, Tool
-from langchain.llms.fake import FakeListLLM
+from langchain_community.llms.fake import FakeListLLM
 import yfinance as yf
 import pandas as pd
 from ta.momentum import RSIIndicator
@@ -28,7 +28,14 @@ def check_stock(ticker: str) -> str:
 
 # Set up LangChain agent
 llm = FakeListLLM(responses=[""])
-tools = [Tool.from_function(check_stock)]
+tools = [
+    Tool.from_function(
+        func=check_stock,
+        name="check_stock",
+        description="Checks stock indicators and returns a Buy/Sell/Hold decision"
+    )
+]
+
 agent = initialize_agent(tools, llm, agent_type="zero-shot-react-description")
 
 # List of stocks to evaluate
