@@ -2,9 +2,8 @@ import yfinance as yf
 import pandas as pd
 from ta.momentum import RSIIndicator
 from langchain.agents import Tool, initialize_agent
-from langchain.llms import HuggingFacePipeline
+from langchain_huggingface import HuggingFacePipeline
 from transformers import pipeline
-
 
 # ------------------ Tool Function ------------------
 def check_stock(ticker: str) -> str:
@@ -42,12 +41,12 @@ tools = [
 ]
 
 # ------------------ Hugging Face LLM ------------------
-# Using a CPU-friendly model
+# CPU-friendly causal LM (~1.5GB quantized)
 pipe = pipeline(
     "text-generation",
-    model="TheBloke/Llama-2-7b-GPTQ",  # CPU-friendly ~1.5GB
+    model="TheBloke/Llama-2-7b-GPTQ",  # quantized model, CPU-friendly
     max_new_tokens=128,
-    device=-1
+    device=-1  # CPU
 )
 llm = HuggingFacePipeline(pipeline=pipe)
 
@@ -66,5 +65,6 @@ tickers = ["AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"]
 for ticker in tickers:
     result = agent.invoke(f"Check if {ticker} is a good investment using the check_stock tool.")
     print(result)
+
 
 
