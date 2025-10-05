@@ -1,6 +1,6 @@
 langchain
-openai
+transformers
+torch
 yfinance
 pandas
 ta
-python-dotenv
