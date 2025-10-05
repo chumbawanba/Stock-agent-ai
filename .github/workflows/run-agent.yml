@@ -2,7 +2,7 @@ name: Run Stock Agent
 
 on:
   schedule:
-    - cron: '0 14 * * *'  # daily at 14:00 UTC
+    - cron: '0 14 * * *'  # every day at 14:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -25,3 +25,9 @@ jobs:
 
       - name: Run Stock Agent
         run: python stock_agent.py
+
+      - name: Upload CSV as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: stock-report
+          path: stock_report.csv
