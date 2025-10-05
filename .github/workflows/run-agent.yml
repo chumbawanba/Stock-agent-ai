@@ -35,4 +35,3 @@ jobs:
         with:
           name: stock-report
           path: stock_report.csv
-
