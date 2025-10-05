@@ -24,6 +24,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Stock Agent
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: python stock_agent.py
 
       - name: Upload CSV as artifact
