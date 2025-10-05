@@ -11,12 +11,8 @@ def check_stock(ticker: str) -> str:
         return f"{ticker}: No data found."
 
     # Ensure Close is 1D
-    close_series = df["Close"]
-    if isinstance(close_series, pd.DataFrame):
-        close_series = close_series.iloc[:, 0]
-
-    # Calculate RSI
-    df["rsi"] = RSIIndicator(close_series).rsi()
+    close_series = df["Close"].squeeze()
+    df["rsi"] = RSIIndicator(close_series).rsi().squeeze()
 
     # Moving averages
     df["ma50"] = df["Close"].rolling(window=50).mean()
@@ -24,13 +20,20 @@ def check_stock(ticker: str) -> str:
 
     latest = df.iloc[-1]
 
+    # Convert any 1-element Series to scalar
+    rsi = latest["rsi"].item() if isinstance(latest["rsi"], pd.Series) else latest["rsi"]
+    close = latest["Close"].item() if isinstance(latest["Close"], pd.Series) else latest["Close"]
+    ma50 = latest["ma50"].item() if isinstance(latest["ma50"], pd.Series) else latest["ma50"]
+    ma200 = latest["ma200"].item() if isinstance(latest["ma200"], pd.Series) else latest["ma200"]
+
     decision = "HOLD"
-    if latest["rsi"] < 30 and latest["Close"] > latest["ma50"]:
+    if rsi < 30 and close > ma50:
         decision = "BUY"
-    elif latest["rsi"] > 70 or latest["Close"] < latest["ma200"]:
+    elif rsi > 70 or close < ma200:
         decision = "SELL"
 
-    return f"{ticker}: {decision} (RSI={latest['rsi']:.2f}, Price={latest['Close']:.2f})"
+    return f"{ticker}: {decision} (RSI={rsi:.2f}, Price={close:.2f})"
+
 
 
 
