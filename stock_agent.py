@@ -5,6 +5,7 @@ from langchain.agents import Tool, initialize_agent
 from langchain.llms import HuggingFacePipeline
 from transformers import pipeline
 
+
 # ------------------ Tool Function ------------------
 def check_stock(ticker: str) -> str:
     df = yf.download(ticker, period="6mo", interval="1d", auto_adjust=True)
