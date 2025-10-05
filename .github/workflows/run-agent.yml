@@ -2,14 +2,14 @@ name: Run Stock Agent
 
 on:
   schedule:
-    - cron: '0 14 * * *'  # Runs every day at 14:00 UTC (~9am EST)
-  workflow_dispatch:      # Allows manual triggering
+    - cron: '0 14 * * *'  # daily at 14:00 UTC
+  workflow_dispatch:
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repo
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -22,5 +22,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Agent
+      - name: Run Stock Agent
         run: python stock_agent.py
