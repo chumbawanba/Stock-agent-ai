@@ -10,11 +10,15 @@ def check_stock(ticker: str) -> str:
     if df.empty:
         return f"{ticker}: No data found."
 
-    df["rsi"] = RSIIndicator(df["Close"]).rsi()
+    # Calculate RSI correctly
+    df["rsi"] = RSIIndicator(df["Close"]).rsi().squeeze()
+
+    # Moving averages
     df["ma50"] = df["Close"].rolling(window=50).mean()
     df["ma200"] = df["Close"].rolling(window=200).mean()
+
     latest = df.iloc[-1]
-    
+
     decision = "HOLD"
     if latest["rsi"] < 30 and latest["Close"] > latest["ma50"]:
         decision = "BUY"
@@ -22,6 +26,7 @@ def check_stock(ticker: str) -> str:
         decision = "SELL"
 
     return f"{ticker}: {decision} (RSI={latest['rsi']:.2f}, Price={latest['Close']:.2f})"
+
 
 # Tool setup
 tools = [
