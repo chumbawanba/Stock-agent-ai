@@ -1,13 +1,11 @@
-from langchain.tools import tool
-from langchain.agents import initialize_agent, Tool
+from langchain.agents import Tool, initialize_agent
 from langchain_community.llms.fake import FakeListLLM
 import yfinance as yf
 import pandas as pd
 from ta.momentum import RSIIndicator
 
-@tool
+# Tool logic
 def check_stock(ticker: str) -> str:
-    """Check stock using RSI and moving averages. Returns Buy/Sell/Hold decision."""
     df = yf.download(ticker, period="6mo", interval="1d")
     if df.empty:
         return f"{ticker}: No data found."
@@ -15,7 +13,6 @@ def check_stock(ticker: str) -> str:
     df["rsi"] = RSIIndicator(df["Close"]).rsi()
     df["ma50"] = df["Close"].rolling(window=50).mean()
     df["ma200"] = df["Close"].rolling(window=200).mean()
-
     latest = df.iloc[-1]
     
     decision = "HOLD"
@@ -26,8 +23,7 @@ def check_stock(ticker: str) -> str:
 
     return f"{ticker}: {decision} (RSI={latest['rsi']:.2f}, Price={latest['Close']:.2f})"
 
-# Set up LangChain agent
-llm = FakeListLLM(responses=[""])
+# Tool setup
 tools = [
     Tool.from_function(
         func=check_stock,
@@ -36,12 +32,28 @@ tools = [
     )
 ]
 
-agent = initialize_agent(tools, llm, agent_type="zero-shot-react-description")
+# Dummy LLM output that calls the tool directly
+fake_llm = FakeListLLM(
+    responses=[
+        "Action: check_stock\nAction Input: \"AAPL\"",
+        "Action: check_stock\nAction Input: \"TSLA\"",
+        "Action: check_stock\nAction Input: \"NVDA\"",
+        "Action: check_stock\nAction Input: \"GOOGL\"",
+        "Action: check_stock\nAction Input: \"MSFT\""
+    ]
+)
 
-# List of stocks to evaluate
+# Initialize agent
+agent = initialize_agent(
+    tools,
+    llm=fake_llm,
+    agent_type="zero-shot-react-description",
+    handle_parsing_errors=True  # Optional but helpful in dev
+)
+
+# Run agent for multiple tickers
 tickers = ["AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"]
-
-# Run agent on each
 for ticker in tickers:
-    result = agent.run(f"Check if {ticker} is a good investment using the check_stock tool.")
+    result = agent.invoke(f"Check if {ticker} is a good investment using the check_stock tool.")
     print(result)
+
