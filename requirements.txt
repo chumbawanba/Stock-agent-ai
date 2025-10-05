@@ -1,0 +1,4 @@
+langchain
+yfinance
+pandas
+ta
