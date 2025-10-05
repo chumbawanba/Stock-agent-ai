@@ -18,28 +18,34 @@ def check_stock(ticker: str):
     df = yf.download(ticker, period="6mo", interval="1d", auto_adjust=True)
     if df.empty:
         return f"{ticker}: No data found.", None
-    
-    df["rsi"] = RSIIndicator(df["Close"]).rsi()
+
+    close_series = df["Close"]
+    if isinstance(close_series, pd.DataFrame):
+        close_series = close_series.squeeze()  # Flatten 2D to 1D
+
+    df["rsi"] = RSIIndicator(close_series).rsi()
     df["ma50"] = df["Close"].rolling(window=50).mean()
     df["ma200"] = df["Close"].rolling(window=200).mean()
-    
+
     latest = df.iloc[-1]
     rsi = latest["rsi"]
     close = latest["Close"]
     ma50 = latest["ma50"]
     ma200 = latest["ma200"]
-    
+
     if rsi < 30 and close > ma50:
         decision = "BUY"
     elif rsi > 70 or close < ma200:
         decision = "SELL"
     else:
         decision = "HOLD"
-    
+
     text = f"{ticker}: {decision} (RSI={rsi:.2f}, Price={close:.2f})"
-    data = {"Ticker": ticker, "Decision": decision, "RSI": rsi, "Price": close, "MA50": ma50, "MA200": ma200, "Date": datetime.today().strftime("%Y-%m-%d")}
-    
+    data = {"Ticker": ticker, "Decision": decision, "RSI": rsi, "Price": close,
+            "MA50": ma50, "MA200": ma200, "Date": datetime.today().strftime("%Y-%m-%d")}
+
     return text, data
+
 
 # ------------------ List of tickers ------------------
 tickers = ["AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"]
