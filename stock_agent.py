@@ -6,7 +6,8 @@ from ta.momentum import RSIIndicator
 
 # Tool logic
 def check_stock(ticker: str) -> str:
-    df = yf.download(ticker, period="6mo", interval="1d")
+    df = yf.download(ticker, period="6mo", interval="1d", auto_adjust=True)
+
     if df.empty:
         return f"{ticker}: No data found."
 
