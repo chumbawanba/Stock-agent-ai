@@ -44,9 +44,9 @@ tools = [
 # CPU-friendly causal LM (~1.5GB quantized)
 pipe = pipeline(
     "text-generation",
-    model="TheBloke/Llama-2-7b-GPTQ",  # quantized model, CPU-friendly
+    model="TheBloke/Llama-2-7b-GPTQ",
     max_new_tokens=128,
-    device=-1  # CPU
+    device=-1
 )
 llm = HuggingFacePipeline(pipeline=pipe)
 
