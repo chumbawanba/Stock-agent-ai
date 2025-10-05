@@ -3,6 +3,8 @@ langchain-community
 langchain-huggingface
 transformers
 torch
+optimum
 yfinance
 pandas
 ta
+
