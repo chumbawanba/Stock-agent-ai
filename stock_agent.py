@@ -59,7 +59,9 @@ def check_stock(ticker: str):
     return text, data
 
 # ------------------ List of tickers ------------------
-tickers = ["AAPL", "TSLA", "NVDA", "GOOGL", "MSFT"]
+# Read tickers from text file
+with open("stocks.txt", "r") as f:
+    tickers = [line.strip() for line in f if line.strip()]
 results = []
 messages_to_send = []
 
