@@ -45,7 +45,7 @@ tools = [
 # Using a CPU-friendly model
 pipe = pipeline(
     "text-generation",
-    model="google/flan-t5-small",  # ~80 MB
+    model="TheBloke/Llama-2-7b-GPTQ",  # CPU-friendly ~1.5GB
     max_new_tokens=128,
     device=-1
 )
