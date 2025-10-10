@@ -89,7 +89,9 @@ def highlight_action(val):
 styled_df = df.style.applymap(highlight_action, subset=["Action"])
 
 st.markdown("### 📈 Market Overview")
-st.dataframe(styled_df.to_html(escape=False), unsafe_allow_html=True)
+
+# Render styled DataFrame as HTML (supports colors + links)
+st.markdown(styled_df.to_html(escape=False), unsafe_allow_html=True)
 
 st.caption("💡 *AlphaLayer helps you make sense of the markets with data-driven clarity.*")
 
