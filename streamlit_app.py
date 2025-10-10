@@ -93,9 +93,9 @@ def analyze_ticker(ticker, min_days=50):
             "RSI": round(rsi, 2),
             "MA50": round(ma50, 2) if not np.isnan(ma50) else "N/A",
             "Potential Gain %": potential_gain,
-            "Link": f'<a href="{yahoo_link}" target="_blank">Yahoo</a>'
+            "Link": yahoo_link
         }
-
+        #"Link": f'<a href="{yahoo_link}" target="_blank">Yahoo</a>'
     except Exception as e:
         # Return an error row but keep the app running
         return {"Ticker": ticker, "Action": f"Error: {e}", "Price": "N/A", "RSI": "N/A", "MA50": "N/A", "Potential Gain %": "N/A", "Link": ""}
