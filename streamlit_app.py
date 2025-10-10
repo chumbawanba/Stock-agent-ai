@@ -62,8 +62,8 @@ except FileNotFoundError:
     st.error("⚠️ 'stocks.txt' file not found. Please create one with ticker symbols (one per line).")
     st.stop()
 
-st.sidebar.header("📁 Stock List")
-st.sidebar.write(f"Loaded **{len(tickers)}** tickers from `stocks.txt`")
+#st.sidebar.header("📁 Stock List")
+#st.sidebar.write(f"Loaded **{len(tickers)}** tickers from `stocks.txt`")
 
 # Analyze
 st.write("Analyzing market signals... please wait ⏳")
