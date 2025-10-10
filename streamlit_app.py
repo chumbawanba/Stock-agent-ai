@@ -20,42 +20,47 @@ def load_tickers():
         return []
 
 # --- Analyze Stock ---
-def analyze_stock(ticker):
+def check_stock(ticker):
     try:
-        end = datetime.date.today()
-        start = end - datetime.timedelta(days=365 * 2)  # 2 years of data
-        df = yf.download(ticker, start=start, end=end)
+        df = yf.download(ticker, period="1y", interval="1d")
 
-        if df.empty:
-            return None, None
+        # ✅ Flatten 2D arrays (fix for tickers like BRK-B, BF-B)
+        df["Close"] = df["Close"].squeeze()
 
-        df["rsi"] = RSIIndicator(close=df["Close"]).rsi()
-        df["ma50"] = SMAIndicator(close=df["Close"], window=50).sma_indicator()
+        # Compute indicators
+        df["rsi"] = RSIIndicator(df["Close"]).rsi()
+        df["ma50"] = df["Close"].rolling(window=50).mean()
+        df["ma200"] = df["Close"].rolling(window=200).mean()
 
         latest = df.iloc[-1]
-        action = "HOLD"
-        color = "gray"
+
+        action = "Hold"
+        reason = "No clear signal."
+        potential_return = 0
 
         if latest["rsi"] < 30 and latest["Close"] > latest["ma50"]:
-            action = "BUY"
-            color = "green"
+            action = "Buy"
+            reason = "RSI is low and price is above MA50 — potential uptrend."
+            potential_return = ((latest["ma200"] - latest["Close"]) / latest["Close"]) * 100
         elif latest["rsi"] > 70 and latest["Close"] < latest["ma50"]:
-            action = "SELL"
-            color = "red"
+            action = "Sell"
+            reason = "RSI is high and price fell below MA50 — potential downtrend."
+            potential_return = ((latest["Close"] - latest["ma200"]) / latest["Close"]) * 100
 
-        yahoo_link = f"https://finance.yahoo.com/quote/{ticker}"
         return {
-            "Ticker": f"[{ticker}]({yahoo_link})",
-            "Price": f"${latest['Close']:.2f}",
-            "RSI": f"{latest['rsi']:.2f}",
-            "MA50": f"${latest['ma50']:.2f}",
-            "Signal": action,
-            "Color": color
-        }, df
+            "Symbol": ticker,
+            "Action": action,
+            "Reason": reason,
+            "Potential Return (%)": round(potential_return, 2)
+        }
 
     except Exception as e:
-        st.error(f"Error analyzing {ticker}: {e}")
-        return None, None
+        return {
+            "Symbol": ticker,
+            "Action": "Error",
+            "Reason": f"Error analyzing {ticker}: {str(e)}",
+            "Potential Return (%)": 0
+        }
 
 # --- UI ---
 st.title("📈 AlphaLayer")
