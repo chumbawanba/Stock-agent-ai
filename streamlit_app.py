@@ -3,101 +3,94 @@ import pandas as pd
 import yfinance as yf
 from ta.momentum import RSIIndicator
 from ta.trend import SMAIndicator
-import datetime
 
-# --- Page config ---
-st.set_page_config(page_title="AlphaLayer - Stock Signals", layout="wide")
-
-# --- Load ticker list ---
-TICKER_FILE = "stocks.txt"
-
-def load_tickers():
-    try:
-        with open(TICKER_FILE, "r") as f:
-            tickers = [line.strip().upper() for line in f if line.strip()]
-        return tickers
-    except FileNotFoundError:
-        return []
-
-# --- Analyze Stock ---
+# -------------------------------
+# Core Stock Analysis Logic
+# -------------------------------
 def check_stock(ticker):
     try:
-        df = yf.download(ticker, period="1y", interval="1d")
+        df = yf.download(ticker, period="1y", progress=False)
+        if df.empty:
+            return {"Symbol": ticker, "Action": "No Data", "Potential Gain (%)": "N/A", "Yahoo Link": ""}
 
-        # ✅ Flatten 2D arrays (fix for tickers like BRK-B, BF-B)
-        df["Close"] = df["Close"].squeeze()
-
-        # Compute indicators
+        df["Close"] = df["Close"].astype(float)
         df["rsi"] = RSIIndicator(df["Close"]).rsi()
-        df["ma50"] = df["Close"].rolling(window=50).mean()
-        df["ma200"] = df["Close"].rolling(window=200).mean()
+        df["ma50"] = SMAIndicator(df["Close"], window=50).sma_indicator()
+        df["ma200"] = SMAIndicator(df["Close"], window=200).sma_indicator()
 
         latest = df.iloc[-1]
+        close = latest["Close"]
+        rsi = latest["rsi"]
+        ma50 = latest["ma50"]
+        ma200 = latest["ma200"]
 
-        action = "Hold"
-        reason = "No clear signal."
-        potential_return = 0
-
-        if latest["rsi"] < 30 and latest["Close"] > latest["ma50"]:
+        # Generate simple buy/sell rules
+        if rsi < 30 and close > ma50:
             action = "Buy"
-            reason = "RSI is low and price is above MA50 — potential uptrend."
-            potential_return = ((latest["ma200"] - latest["Close"]) / latest["Close"]) * 100
-        elif latest["rsi"] > 70 and latest["Close"] < latest["ma50"]:
+        elif rsi > 70 and close < ma50:
             action = "Sell"
-            reason = "RSI is high and price fell below MA50 — potential downtrend."
-            potential_return = ((latest["Close"] - latest["ma200"]) / latest["Close"]) * 100
+        else:
+            action = "Hold"
 
+        # Estimate potential gain based on 1y high vs current
+        year_high = df["Close"].max()
+        potential_gain = round(((year_high - close) / close) * 100, 2)
+
+        yahoo_link = f"https://finance.yahoo.com/quote/{ticker}"
         return {
             "Symbol": ticker,
             "Action": action,
-            "Reason": reason,
-            "Potential Return (%)": round(potential_return, 2)
+            "Potential Gain (%)": potential_gain,
+            "Yahoo Link": yahoo_link
         }
-
     except Exception as e:
-        return {
-            "Symbol": ticker,
-            "Action": "Error",
-            "Reason": f"Error analyzing {ticker}: {str(e)}",
-            "Potential Return (%)": 0
-        }
+        return {"Symbol": ticker, "Action": f"Error: {str(e)}", "Potential Gain (%)": "N/A", "Yahoo Link": ""}
 
-# --- UI ---
-st.title("📈 AlphaLayer")
-st.subheader("Augmented Intelligence for Smarter Stock Signals")
+# -------------------------------
+# Streamlit UI
+# -------------------------------
+st.set_page_config(page_title="AlphaLayer — Smart Stock Insights", page_icon="📈", layout="wide")
 
-st.markdown("---")
+st.title("📊 AlphaLayer — Augmented Market Intelligence")
+st.markdown("### Smarter, faster insights powered by data & logic, not hype.")
 
-tickers = load_tickers()
-if not tickers:
-    st.warning("No tickers found. Please add tickers to `stocks.txt`.")
+# Load tickers from file
+try:
+    with open("stocks.txt", "r") as f:
+        tickers = [line.strip() for line in f.readlines() if line.strip()]
+except FileNotFoundError:
+    st.error("⚠️ 'stocks.txt' file not found. Please create one with ticker symbols (one per line).")
     st.stop()
 
-data_rows = []
-for ticker in tickers:
-    result, _ = analyze_stock(ticker)
-    if result:
-        data_rows.append(result)
+st.sidebar.header("📁 Stock List")
+st.sidebar.write(f"Loaded **{len(tickers)}** tickers from `stocks.txt`")
 
-if not data_rows:
-    st.error("No data available to display.")
-    st.stop()
+# Analyze
+st.write("Analyzing market signals... please wait ⏳")
 
-df_display = pd.DataFrame(data_rows)
+results = [check_stock(ticker) for ticker in tickers]
+df = pd.DataFrame(results)
 
-# Apply color formatting
-def highlight_signal(val, color):
-    return f"color: white; background-color: {color}; font-weight: bold"
-
-colors = df_display["Color"]
-df_display_styled = df_display.drop(columns=["Color"]).style.apply(
-    lambda _: [highlight_signal(sig, col) for sig, col in zip(df_display["Signal"], colors)],
-    axis=1
+# Add clickable links
+df["Yahoo Link"] = df["Yahoo Link"].apply(
+    lambda x: f"[🔗 Open]({x})" if isinstance(x, str) and x != "" else ""
 )
 
-st.dataframe(df_display_styled, use_container_width=True)
+# Highlight actions
+def highlight_action(val):
+    if val == "Buy":
+        return "background-color: #b6f2b6"  # green
+    elif val == "Sell":
+        return "background-color: #f5b7b1"  # red
+    elif val == "Hold":
+        return "background-color: #e0e0e0"  # gray
+    return ""
 
-# Footer
-st.markdown("---")
-st.caption("💡 This is a Proof-of-Concept (PoC) powered by Streamlit & yFinance — not financial advice.")
+styled_df = df.style.applymap(highlight_action, subset=["Action"])
+
+st.markdown("### 📈 Market Overview")
+st.dataframe(styled_df.to_html(escape=False), unsafe_allow_html=True)
+
+st.caption("💡 *AlphaLayer helps you make sense of the markets with data-driven clarity.*")
+
 
