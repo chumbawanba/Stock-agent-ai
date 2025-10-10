@@ -4,95 +4,95 @@ import yfinance as yf
 from ta.momentum import RSIIndicator
 from ta.trend import SMAIndicator
 
-# -------------------------------
-# Core Stock Analysis Logic
-# -------------------------------
-def check_stock(ticker):
-    try:
-        df = yf.download(ticker, period="1y", progress=False)
-        if df.empty:
-            return {"Symbol": ticker, "Action": "No Data", "Potential Gain (%)": "N/A", "Yahoo Link": ""}
+st.set_page_config(page_title="AlphaLayer", page_icon="📊", layout="wide")
 
-        df["Close"] = df["Close"].astype(float)
-        df["rsi"] = RSIIndicator(df["Close"]).rsi()
-        df["ma50"] = SMAIndicator(df["Close"], window=50).sma_indicator()
-        df["ma200"] = SMAIndicator(df["Close"], window=200).sma_indicator()
+st.title("💹 AlphaLayer — Augmented Market Insights")
+
+st.markdown(
+    """
+    Welcome to **AlphaLayer** — your intelligent investment assistant.  
+    This Proof of Concept analyzes stocks using basic RSI & SMA indicators,  
+    and highlights *Buy / Sell / Hold* opportunities.
+    """
+)
+
+# --- Load ticker list from GitHub file ---
+try:
+    with open("stocks.txt") as f:
+        tickers = [line.strip().upper() for line in f if line.strip()]
+except FileNotFoundError:
+    tickers = ["AAPL", "MSFT", "TSLA", "NVDA", "AMZN"]
+
+st.sidebar.header("📋 Settings")
+selected_tickers = st.sidebar.multiselect("Select stocks to analyze", tickers, default=tickers)
+
+# --- Function to analyze one stock ---
+def analyze_stock(ticker):
+    try:
+        df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+        if df.empty:
+            return f"No data for {ticker}", None
+
+        # Ensure columns are 1D
+        for col in ["Close"]:
+            df[col] = df[col].squeeze()
+
+        # Calculate indicators
+        df["rsi"] = RSIIndicator(df["Close"].astype(float)).rsi()
+        df["ma50"] = SMAIndicator(df["Close"].astype(float), window=50).sma_indicator()
 
         latest = df.iloc[-1]
-        close = latest["Close"]
-        rsi = latest["rsi"]
-        ma50 = latest["ma50"]
-        ma200 = latest["ma200"]
 
-        # Generate simple buy/sell rules
-        if rsi < 30 and close > ma50:
+        # Rules for Buy/Sell/Hold
+        if latest["rsi"] < 30 and latest["Close"] > latest["ma50"]:
             action = "Buy"
-        elif rsi > 70 and close < ma50:
+        elif latest["rsi"] > 70 and latest["Close"] < latest["ma50"]:
             action = "Sell"
         else:
             action = "Hold"
 
-        # Estimate potential gain based on 1y high vs current
-        year_high = df["Close"].max()
-        potential_gain = round(((year_high - close) / close) * 100, 2)
+        # Potential gain (simple last-year gain)
+        past_year = yf.download(ticker, period="1y", interval="1d", progress=False)
+        potential_gain = (
+            (latest["Close"] / past_year["Close"].iloc[0] - 1) * 100 if not past_year.empty else 0
+        )
 
-        yahoo_link = f"https://finance.yahoo.com/quote/{ticker}"
         return {
-            "Symbol": ticker,
+            "Ticker": ticker,
+            "Price": round(latest["Close"], 2),
+            "RSI": round(latest["rsi"], 2),
+            "MA50": round(latest["ma50"], 2),
             "Action": action,
-            "Potential Gain (%)": potential_gain,
-            "Yahoo Link": yahoo_link
+            "Potential Gain %": round(potential_gain, 2),
+            "Yahoo Finance": f'<a href="https://finance.yahoo.com/quote/{ticker}" target="_blank">🔗 Link</a>'
         }
+
     except Exception as e:
-        return {"Symbol": ticker, "Action": f"Error: {str(e)}", "Potential Gain (%)": "N/A", "Yahoo Link": ""}
+        return {"Ticker": ticker, "Action": f"Error: {str(e)}"}
 
-# -------------------------------
-# Streamlit UI
-# -------------------------------
-st.set_page_config(page_title="AlphaLayer — Smart Stock Insights", page_icon="📈", layout="wide")
+# --- Run analysis ---
+results = [analyze_stock(t) for t in selected_tickers if t]
 
-st.title("📊 AlphaLayer — Augmented Market Intelligence")
-st.markdown("### Smarter, faster insights powered by data & logic, not hype.")
+# --- Filter out None results ---
+data = [r for r in results if isinstance(r, dict)]
+if not data:
+    st.warning("No valid stock data found.")
+else:
+    df = pd.DataFrame(data)
 
-# Load tickers from file
-try:
-    with open("stocks.txt", "r") as f:
-        tickers = [line.strip() for line in f.readlines() if line.strip()]
-except FileNotFoundError:
-    st.error("⚠️ 'stocks.txt' file not found. Please create one with ticker symbols (one per line).")
-    st.stop()
+    # --- Styling ---
+    def highlight_action(val):
+        if val == "Buy":
+            return "background-color: #b6f2b6"  # green
+        elif val == "Sell":
+            return "background-color: #f5b7b1"  # red
+        elif val == "Hold":
+            return "background-color: #e0e0e0"  # gray
+        return ""
 
-#st.sidebar.header("📁 Stock List")
-#st.sidebar.write(f"Loaded **{len(tickers)}** tickers from `stocks.txt`")
+    styled_df = df.style.applymap(highlight_action, subset=["Action"])
 
-# Analyze
-st.write("Analyzing market signals... please wait ⏳")
-
-results = [check_stock(ticker) for ticker in tickers]
-df = pd.DataFrame(results)
-
-# Add clickable links
-df["Yahoo Link"] = df["Yahoo Link"].apply(
-    lambda x: f"[🔗 Open]({x})" if isinstance(x, str) and x != "" else ""
-)
-
-# Highlight actions
-def highlight_action(val):
-    if val == "Buy":
-        return "background-color: #b6f2b6"  # green
-    elif val == "Sell":
-        return "background-color: #f5b7b1"  # red
-    elif val == "Hold":
-        return "background-color: #e0e0e0"  # gray
-    return ""
-
-styled_df = df.style.applymap(highlight_action, subset=["Action"])
-
-st.markdown("### 📈 Market Overview")
-
-# Render styled DataFrame as HTML (supports colors + links)
-st.markdown(styled_df.to_html(escape=False), unsafe_allow_html=True)
-
-st.caption("💡 *AlphaLayer helps you make sense of the markets with data-driven clarity.*")
-
+    st.markdown("### 📈 Market Overview")
+    st.markdown(styled_df.to_html(escape=False), unsafe_allow_html=True)
+    st.caption("💡 *AlphaLayer helps you make sense of the markets with data-driven clarity.*")
 
