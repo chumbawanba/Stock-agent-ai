@@ -39,7 +39,7 @@ def check_stock(ticker):
         yahoo_link = f"https://finance.yahoo.com/quote/{ticker}"
         return {
             "Symbol": ticker,
-            "Actions": action,
+            "Action": action,
             "Potential Gain (%)": potential_gain,
             "Yahoo Link": yahoo_link
         }
@@ -86,7 +86,7 @@ def highlight_action(val):
         return "background-color: #e0e0e0"  # gray
     return ""
 
-styled_df = df.style.applymap(highlight_action, subset=["Actions"])
+styled_df = df.style.applymap(highlight_action, subset=["Action"])
 
 st.markdown("### 📈 Market Overview")
 
