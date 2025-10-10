@@ -44,7 +44,7 @@ def check_stock(ticker):
             "Yahoo Link": yahoo_link
         }
     except Exception as e:
-        return {"Symbol": ticker, "Action": f"Error: {str(e)}", "Potential Gain (%)": "N/A", "Yahoo Link": ""}
+        return {"Symbol": ticker, "Action": f"Error: {str(e)}", "Potential Gain (%)": "N/A", "Yahoo Link": yahoo_link}
 
 # -------------------------------
 # Streamlit UI
