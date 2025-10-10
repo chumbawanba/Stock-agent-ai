@@ -23,48 +23,47 @@ except FileNotFoundError:
     tickers = []
 
 # ------------------ Stock rules function ------------------
-def check_stock(ticker: str):
-    df = yf.download(ticker, period="6mo", interval="1d", auto_adjust=True)
-    if df.empty:
-        return f"{ticker}: No data found.", None
+def check_stock(ticker):
+    try:
+        df = yf.download(ticker, period="1y", interval="1d")
 
-    # Flatten Close column in case it's 2D
-    close_series = df["Close"]
-    if isinstance(close_series, pd.DataFrame):
-        close_series = close_series.squeeze()
+        # ✅ Ensure Close is 1D (some tickers like BRK-B return 2D arrays)
+        df["Close"] = df["Close"].squeeze()
 
-    df["rsi"] = RSIIndicator(close_series).rsi()
-    df["ma50"] = df["Close"].rolling(window=50).mean()
-    df["ma200"] = df["Close"].rolling(window=200).mean()
+        # Compute indicators
+        df["rsi"] = RSIIndicator(df["Close"]).rsi()
+        df["ma50"] = df["Close"].rolling(window=50).mean()
+        df["ma200"] = df["Close"].rolling(window=200).mean()
 
-    latest = df.iloc[-1]
+        latest = df.iloc[-1]
 
-    # Convert Series to scalar
-    rsi = latest["rsi"].item() if hasattr(latest["rsi"], "item") else latest["rsi"]
-    close = latest["Close"].item() if hasattr(latest["Close"], "item") else latest["Close"]
-    ma50 = latest["ma50"].item() if hasattr(latest["ma50"], "item") else latest["ma50"]
-    ma200 = latest["ma200"].item() if hasattr(latest["ma200"], "item") else latest["ma200"]
+        action = "Hold"
+        reason = "No clear signal."
+        potential_return = 0
 
-    # Apply rules
-    if rsi < 30 and close > ma50:
-        decision = "BUY"
-    elif rsi > 70 or close < ma200:
-        decision = "SELL"
-    else:
-        decision = "HOLD"
+        if latest["rsi"] < 30 and latest["Close"] > latest["ma50"]:
+            action = "Buy"
+            reason = "RSI is low and price is above MA50 — potential uptrend."
+            potential_return = ((latest["ma200"] - latest["Close"]) / latest["Close"]) * 100
+        elif latest["rsi"] > 70 and latest["Close"] < latest["ma50"]:
+            action = "Sell"
+            reason = "RSI is high and price fell below MA50 — potential downtrend."
+            potential_return = ((latest["Close"] - latest["ma200"]) / latest["Close"]) * 100
 
-    text = f"{ticker}: {decision} (RSI={rsi:.2f}, Price={close:.2f})"
-    data = {
-        "Ticker": ticker,
-        "Decision": decision,
-        "RSI": round(rsi, 2),
-        "Price": round(close, 2),
-        "MA50": round(ma50, 2),
-        "MA200": round(ma200, 2),
-        "Date": datetime.today().strftime("%Y-%m-%d")
-    }
+        return {
+            "Symbol": ticker,
+            "Action": action,
+            "Reason": reason,
+            "Potential Return (%)": round(potential_return, 2)
+        }
 
-    return text, data
+    except Exception as e:
+        return {
+            "Symbol": ticker,
+            "Action": "Error",
+            "Reason": f"Error analyzing {ticker}: {str(e)}",
+            "Potential Return (%)": 0
+        }
 
 # ------------------ Check stocks ------------------
 results = []
