@@ -39,7 +39,7 @@ def check_stock(ticker):
         yahoo_link = f"https://finance.yahoo.com/quote/{ticker}"
         return {
             "Symbol": ticker,
-            "Action": action,
+            "Actions": action,
             "Potential Gain (%)": potential_gain,
             "Yahoo Link": yahoo_link
         }
