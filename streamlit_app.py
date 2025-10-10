@@ -86,7 +86,7 @@ def highlight_action(val):
         return "background-color: #e0e0e0"  # gray
     return ""
 
-styled_df = df.style.applymap(highlight_action, subset=["Action"])
+styled_df = df.style.applymap(highlight_action, subset=["Actions"])
 
 st.markdown("### 📈 Market Overview")
 
