@@ -8,13 +8,20 @@ from ta.momentum import RSIIndicator
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-st.set_page_config(page_title="AlphaLayer - Smart Watchlists", page_icon="📈", layout="wide")
+st.set_page_config(page_title="AlphaLayer Watchlists", page_icon="📈", layout="wide")
 
 WATCHLIST_DIR = "watchlists"
 if not os.path.exists(WATCHLIST_DIR):
     os.makedirs(WATCHLIST_DIR)
-    with open(os.path.join(WATCHLIST_DIR, "stocks.txt"), "w") as f:
-        f.write("AAPL\nMSFT\nGOOGL\nNVDA\nTSLA\n")
+
+DEFAULT_LISTS = ["tech.txt", "growth.txt", "dividend.txt"]
+
+# Ensure the three lists exist
+for filename in DEFAULT_LISTS:
+    path = os.path.join(WATCHLIST_DIR, filename)
+    if not os.path.exists(path):
+        with open(path, "w") as f:
+            f.write("AAPL\nMSFT\nGOOGL\n")
 
 # -------------------------------
 # FUNCTIONS
@@ -24,34 +31,32 @@ def get_moving_average(series, window):
     return series.rolling(window=window).mean()
 
 def analyze_stock(ticker):
-    """Analyze one stock and return indicators + suggested action."""
+    """Analyze one stock and return basic buy/sell/hold signals."""
     try:
         df = yf.download(ticker, period="6mo", progress=False)
         if df.empty:
             return {"Ticker": ticker, "Error": "No data", "Link": f"https://finance.yahoo.com/quote/{ticker}"}
 
-        df["RSI"] = RSIIndicator(df["Close"]).rsi().squeeze()
+        df["RSI"] = RSIIndicator(df["Close"].squeeze()).rsi()
         df["MA50"] = get_moving_average(df["Close"], 50)
         df["MA200"] = get_moving_average(df["Close"], 200)
 
         rsi = float(df["RSI"].iloc[-1])
         ma50 = float(df["MA50"].iloc[-1])
-        ma200 = float(df["MA200"].iloc[-1])
         price = float(df["Close"].iloc[-1])
 
         if rsi < 30 and price > ma50:
-            action = "BUY"
+            action = "🟢 BUY"
         elif rsi > 70 and price < ma50:
-            action = "SELL"
+            action = "🔴 SELL"
         else:
-            action = "HOLD"
+            action = "⚪ HOLD"
 
         return {
             "Ticker": ticker,
             "Price": round(price, 2),
             "RSI": round(rsi, 2),
             "MA50": round(ma50, 2),
-            "MA200": round(ma200, 2),
             "Action": action,
             "Link": f"https://finance.yahoo.com/quote/{ticker}",
         }
@@ -59,42 +64,54 @@ def analyze_stock(ticker):
     except Exception as e:
         return {"Ticker": ticker, "Error": str(e), "Link": f"https://finance.yahoo.com/quote/{ticker}"}
 
-def load_watchlist_from_file(filename):
+def load_watchlist(filename):
     path = os.path.join(WATCHLIST_DIR, filename)
     if not os.path.exists(path):
         return []
     with open(path) as f:
         return [line.strip().upper() for line in f if line.strip()]
 
+def save_watchlist(filename, tickers):
+    path = os.path.join(WATCHLIST_DIR, filename)
+    with open(path, "w") as f:
+        f.write("\n".join(sorted(set(tickers))))
+
 # -------------------------------
 # SIDEBAR
 # -------------------------------
-st.sidebar.title("📋 Watchlists")
+st.sidebar.title("📋 Manage Watchlists")
 
-available_lists = [f for f in os.listdir(WATCHLIST_DIR) if f.endswith(".txt")]
-selected_list = st.sidebar.selectbox("Choose a shared watchlist", available_lists)
+selected_file = st.sidebar.selectbox("Choose a watchlist", DEFAULT_LISTS)
 
-tickers = load_watchlist_from_file(selected_list)
+tickers = load_watchlist(selected_file)
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🧠 Create Your Own Watchlist")
-user_tickers = st.sidebar.text_area("Enter tickers (comma-separated)", "AAPL, MSFT, TSLA")
-custom_watchlist = [t.strip().upper() for t in user_tickers.split(",") if t.strip()]
+# Add ticker
+new_ticker = st.sidebar.text_input("Add new ticker (e.g. NVDA)")
+if st.sidebar.button("➕ Add Ticker"):
+    if new_ticker.strip():
+        tickers.append(new_ticker.strip().upper())
+        save_watchlist(selected_file, tickers)
+        st.sidebar.success(f"Added {new_ticker.upper()} to {selected_file}")
 
-if st.sidebar.button("Use My Watchlist"):
-    tickers = custom_watchlist
-    st.sidebar.success("✅ Using your custom watchlist.")
+# Remove ticker
+if tickers:
+    remove_ticker = st.sidebar.selectbox("Remove a ticker", [""] + tickers)
+    if st.sidebar.button("🗑️ Remove Selected"):
+        if remove_ticker:
+            tickers = [t for t in tickers if t != remove_ticker]
+            save_watchlist(selected_file, tickers)
+            st.sidebar.warning(f"Removed {remove_ticker} from {selected_file}")
 
 # -------------------------------
 # MAIN DASHBOARD
 # -------------------------------
-st.title("💹 AlphaLayer — Smarter Stock Insights")
-st.caption("An augmented knowledge layer for data-driven investors.")
+st.title("💹 AlphaLayer — Simple Watchlists")
+st.caption("Smarter insights, simplified.")
 
-st.markdown("### 📘 Indicator Descriptions")
 st.markdown("""
-- **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
-- **MA50 / MA200:** Moving averages — identify short and long-term trends.  
+### 📘 Indicator Descriptions
+- **RSI (Relative Strength Index):** Measures momentum — below 30 = oversold, above 70 = overbought.  
+- **MA50:** 50-day moving average — short-term trend.  
 - **Signals:**  
     🟢 **BUY** = RSI < 30 & Price > MA50  
     🔴 **SELL** = RSI > 70 & Price < MA50  
@@ -102,47 +119,28 @@ st.markdown("""
 """)
 
 st.markdown("---")
-st.subheader(f"📊 Analyzing Watchlist: `{selected_list.replace('.txt', '')}`")
+st.subheader(f"📊 Watchlist: `{selected_file.replace('.txt', '').capitalize()}`")
 
 results = [analyze_stock(t) for t in tickers]
 df = pd.DataFrame(results)
 
-# Drop rows with missing or invalid tickers
-df = df.dropna(subset=["Ticker"])
+# Handle errors
+if "Error" in df.columns and df["Error"].notna().any():
+    with st.expander("⚠️ Some tickers had issues"):
+        st.write(df[df["Error"].notna()][["Ticker", "Error"]])
 
-# If there are errors, show them in a collapsible box
-error_rows = df[df["Error"].notna()] if "Error" in df.columns else pd.DataFrame()
-if not error_rows.empty:
-    with st.expander("⚠️ Errors loading some tickers"):
-        st.write(error_rows[["Ticker", "Error"]])
-
-# Only show valid results
+# Show valid data only
 df = df[df["Error"].isna()] if "Error" in df.columns else df
 
 if not df.empty:
-    # Clickable links
     df["Ticker"] = df.apply(
-        lambda x: f"[{x['Ticker']}]({x['Link']})" if "Link" in x else x["Ticker"], axis=1
+        lambda x: f"[{x['Ticker']}]({x['Link']})", axis=1
     )
-
-    # Replace action text with colored emojis
-    def color_action(action):
-        if action == "BUY":
-            return "🟢 BUY"
-        elif action == "SELL":
-            return "🔴 SELL"
-        else:
-            return "⚪ HOLD"
-
-    df["Action"] = df["Action"].apply(color_action)
-
-    st.dataframe(
-        df[["Ticker", "Price", "RSI", "MA50", "MA200", "Action"]],
-        use_container_width=True,
-    )
+    st.dataframe(df[["Ticker", "Price", "RSI", "MA50", "Action"]], use_container_width=True)
 else:
-    st.warning("No valid stock data found. Check your watchlist tickers.")
+    st.info("No valid data to display.")
 
 st.markdown("---")
-st.caption("💡 *AlphaLayer — Turning signals into insight.*")
+st.caption("💡 *AlphaLayer — Clear signals, smarter investing.*")
+
 
