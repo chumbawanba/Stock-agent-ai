@@ -16,10 +16,14 @@ DEFAULT_LISTS = ["Watch_list.txt", "wl_edgar.txt", "wl_tiago.txt"]
 
 # Ensure the three lists exist
 for filename in DEFAULT_LISTS:
-    path = os.path.join(WATCHLIST_DIR, f"{filename}.txt")
+    path = os.path.join(WATCHLIST_DIR, filename)
     if not os.path.exists(path):
         with open(path, "w") as f:
             f.write("AAPL\nMSFT\nGOOGL\n")
+
+# Only show these 3 options in Streamlit (no other files)
+WATCHLIST_CHOICES = [name.replace(".txt", "") for name in DEFAULT_LISTS]
+
     
 RULES_FILE = "rules.json"
 
