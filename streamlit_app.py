@@ -10,8 +10,11 @@ from ta.momentum import RSIIndicator
 # -------------------------------
 st.set_page_config(page_title="AlphaLayer - Smart Watchlists", page_icon="📈", layout="wide")
 
-WATCHLIST_DIR = "watchlists"  # folder with your .txt files
-USE_GOOGLE_SHEET = False      # set to True if you want persistent watchlists via Google Sheets
+WATCHLIST_DIR = "watchlists"
+if not os.path.exists(WATCHLIST_DIR):
+    os.makedirs(WATCHLIST_DIR)
+    with open(os.path.join(WATCHLIST_DIR, "stocks.txt"), "w") as f:
+        f.write("AAPL\nMSFT\nGOOGL\nNVDA\nTSLA\n")
 
 # -------------------------------
 # FUNCTIONS
@@ -21,22 +24,21 @@ def get_moving_average(series, window):
     return series.rolling(window=window).mean()
 
 def analyze_stock(ticker):
-    """Analyze a single stock and return a dictionary of indicators + action."""
+    """Analyze one stock and return indicators + suggested action."""
     try:
         df = yf.download(ticker, period="6mo", progress=False)
         if df.empty:
-            return {"Ticker": ticker, "Error": "No data"}
+            return {"Ticker": ticker, "Error": "No data", "Link": f"https://finance.yahoo.com/quote/{ticker}"}
 
         df["RSI"] = RSIIndicator(df["Close"]).rsi().squeeze()
         df["MA50"] = get_moving_average(df["Close"], 50)
         df["MA200"] = get_moving_average(df["Close"], 200)
 
-        rsi = df["RSI"].iloc[-1]
-        ma50 = df["MA50"].iloc[-1]
-        ma200 = df["MA200"].iloc[-1]
-        price = df["Close"].iloc[-1]
+        rsi = float(df["RSI"].iloc[-1])
+        ma50 = float(df["MA50"].iloc[-1])
+        ma200 = float(df["MA200"].iloc[-1])
+        price = float(df["Close"].iloc[-1])
 
-        # Buy/sell rules
         if rsi < 30 and price > ma50:
             action = "BUY"
         elif rsi > 70 and price < ma50:
@@ -55,29 +57,25 @@ def analyze_stock(ticker):
         }
 
     except Exception as e:
-        return {"Ticker": ticker, "Error": str(e)}
+        return {"Ticker": ticker, "Error": str(e), "Link": f"https://finance.yahoo.com/quote/{ticker}"}
 
 def load_watchlist_from_file(filename):
-    with open(os.path.join(WATCHLIST_DIR, filename)) as f:
+    path = os.path.join(WATCHLIST_DIR, filename)
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
         return [line.strip().upper() for line in f if line.strip()]
 
 # -------------------------------
-# SIDEBAR: WATCHLISTS
+# SIDEBAR
 # -------------------------------
 st.sidebar.title("📋 Watchlists")
 
-if not os.path.exists(WATCHLIST_DIR):
-    os.makedirs(WATCHLIST_DIR)
-    with open(os.path.join(WATCHLIST_DIR, "alphalayermaster.txt"), "w") as f:
-        f.write("AAPL\nMSFT\nGOOGL\nNVDA\nTSLA\n")
-
-# Load available lists
 available_lists = [f for f in os.listdir(WATCHLIST_DIR) if f.endswith(".txt")]
 selected_list = st.sidebar.selectbox("Choose a shared watchlist", available_lists)
 
 tickers = load_watchlist_from_file(selected_list)
 
-# Allow custom list
 st.sidebar.markdown("---")
 st.sidebar.subheader("🧠 Create Your Own Watchlist")
 user_tickers = st.sidebar.text_area("Enter tickers (comma-separated)", "AAPL, MSFT, TSLA")
@@ -96,7 +94,7 @@ st.caption("An augmented knowledge layer for data-driven investors.")
 st.markdown("### 📘 Indicator Descriptions")
 st.markdown("""
 - **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
-- **MA50 / MA200:** Moving averages — help identify short-term and long-term trends.  
+- **MA50 / MA200:** Moving averages — identify short and long-term trends.  
 - **Signals:**  
     🟢 **BUY** = RSI < 30 & Price > MA50  
     🔴 **SELL** = RSI > 70 & Price < MA50  
@@ -106,30 +104,45 @@ st.markdown("""
 st.markdown("---")
 st.subheader(f"📊 Analyzing Watchlist: `{selected_list.replace('.txt', '')}`")
 
-results = []
-for ticker in tickers:
-    result = analyze_stock(ticker)
-    results.append(result)
-
+results = [analyze_stock(t) for t in tickers]
 df = pd.DataFrame(results)
 
-if "Error" in df.columns:
-    df = df.dropna(subset=["Error"])
+# Drop rows with missing or invalid tickers
+df = df.dropna(subset=["Ticker"])
+
+# If there are errors, show them in a collapsible box
+error_rows = df[df["Error"].notna()] if "Error" in df.columns else pd.DataFrame()
+if not error_rows.empty:
+    with st.expander("⚠️ Errors loading some tickers"):
+        st.write(error_rows[["Ticker", "Error"]])
+
+# Only show valid results
+df = df[df["Error"].isna()] if "Error" in df.columns else df
 
 if not df.empty:
-    # Add colors and clickable links
-    def style_row(row):
-        color = "green" if row["Action"] == "BUY" else "red" if row["Action"] == "SELL" else "gray"
-        return [f"color: {color}"] * len(row)
+    # Clickable links
+    df["Ticker"] = df.apply(
+        lambda x: f"[{x['Ticker']}]({x['Link']})" if "Link" in x else x["Ticker"], axis=1
+    )
 
-    df["Ticker"] = df.apply(lambda x: f"[{x['Ticker']}]({x['Link']})", axis=1)
+    # Replace action text with colored emojis
+    def color_action(action):
+        if action == "BUY":
+            return "🟢 BUY"
+        elif action == "SELL":
+            return "🔴 SELL"
+        else:
+            return "⚪ HOLD"
+
+    df["Action"] = df["Action"].apply(color_action)
 
     st.dataframe(
         df[["Ticker", "Price", "RSI", "MA50", "MA200", "Action"]],
         use_container_width=True,
     )
 else:
-    st.warning("No valid stock data found.")
+    st.warning("No valid stock data found. Check your watchlist tickers.")
 
 st.markdown("---")
 st.caption("💡 *AlphaLayer — Turning signals into insight.*")
+
