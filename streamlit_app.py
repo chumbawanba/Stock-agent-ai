@@ -6,24 +6,11 @@ import os
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator
 from ta.volatility import BollingerBands
-# -------------------------------
-# CONFIGURATION
-# -------------------------------
-st.set_page_config(page_title="AlphaLayer Watchlists", page_icon="📈", layout="wide")
 
+# ---------------- CONFIG ---------------- #
 WATCHLIST_DIR = "watchlists"
-if not os.path.exists(WATCHLIST_DIR):
-    os.makedirs(WATCHLIST_DIR)
-
-DEFAULT_LISTS = ["Watch_list", "wl_edgar", "wl_tiago"]
-
-# Ensure the three lists exist
-for filename in DEFAULT_LISTS:
-    path = os.path.join(WATCHLIST_DIR, filename)
-    if not os.path.exists(path):
-        with open(path, "w") as f:
-            f.write("AAPL\nMSFT\nGOOGL\n")
-
+RULES_FILE = "rules.json"
+os.makedirs(WATCHLIST_DIR, exist_ok=True)
 
 # ---------------- INDICATORS ---------------- #
 def compute_indicators(df):
@@ -61,12 +48,21 @@ def save_rules(rules):
     with open(RULES_FILE, "w") as f:
         json.dump(rules, f, indent=2)
 
-# -------------------------------
-# FUNCTIONS
-# -------------------------------
 
-def get_moving_average(series, window):
-    return series.rolling(window=window).mean()
+# ---------------- WATCHLISTS ---------------- #
+def load_watchlist(name):
+    path = os.path.join(WATCHLIST_DIR, f"{name}.txt")
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return [line.strip() for line in f if line.strip()]
+    return []
+
+def save_watchlist(name, symbols):
+    path = os.path.join(WATCHLIST_DIR, f"{name}.txt")
+    with open(path, "w") as f:
+        for sym in symbols:
+            f.write(sym + "\n")
+
 
 # ---------------- STOCK ANALYSIS ---------------- #
 def analyze_stock(ticker, rules):
@@ -111,18 +107,22 @@ def analyze_stock(ticker, rules):
 
     except Exception:
         return None
-    
-def load_watchlist(filename):
-    path = os.path.join(WATCHLIST_DIR, filename)
-    if not os.path.exists(path):
-        return []
-    with open(path) as f:
-        return [line.strip().upper() for line in f if line.strip()]
 
-def save_watchlist(filename, tickers):
-    path = os.path.join(WATCHLIST_DIR, filename)
-    with open(path, "w") as f:
-        f.write("\n".join(sorted(set(tickers))))
+
+# ---------------- STREAMLIT UI ---------------- #
+st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
+
+st.title("💹 AlphaLayer — Smarter Stock Insights")
+st.markdown("### An augmented knowledge layer for data-driven investors.")
+
+with st.expander("📘 Indicator Descriptions"):
+    st.markdown("""
+    **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
+    **MA50 / MA200:** Moving averages — help identify short-term and long-term trends.  
+    **EMA20:** Exponential moving average, more sensitive to recent prices.  
+    **MACD:** Momentum indicator comparing two EMAs; helps detect trend changes.  
+    **Bollinger Bands:** Measure volatility; prices near lower band may be undervalued.
+    """)
 
 # ----- Sidebar Controls -----
 st.sidebar.header("⚙️ Customize Settings")
@@ -189,4 +189,5 @@ if st.button("🔍 Analyze Watchlist"):
         st.warning("No valid stock data found.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
+
 
