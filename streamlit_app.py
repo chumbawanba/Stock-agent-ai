@@ -194,8 +194,8 @@ if st.button("🔍 Analyze Watchlist"):
 
         styled = df.style.applymap(color_signal, subset=["Signal"])
         st.dataframe(df[["Ticker", "Price", "RSI", "MA50", "Action"]], use_container_width=True)
-else:
-    st.info("No valid data to display.")
+    else:
+        st.info("No valid data to display.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
 
