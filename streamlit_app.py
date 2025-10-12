@@ -168,7 +168,6 @@ if st.sidebar.button("💾 Save Rules"):
     save_rules(rules)
     st.sidebar.success("Rules saved successfully!")
 
-
 # ----- Analyze stocks -----
 if st.button("🔍 Analyze Watchlist"):
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
@@ -193,9 +192,9 @@ if st.button("🔍 Analyze Watchlist"):
                 return ""
 
         styled = df.style.applymap(color_signal, subset=["Signal"])
-        st.dataframe(df[["Ticker", "Price", "RSI", "MA50", "Action"]], use_container_width=True)
+        st.dataframe(df[["Ticker", "Price", "RSI", "MA50", "Signal"]], use_container_width=True)
     else:
-        st.info("No valid data to display.")
+        st.warning("⚠️ No valid stock data found. Check tickers or rules.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
 
