@@ -21,16 +21,13 @@ for filename in DEFAULT_LISTS:
         with open(path, "w") as f:
             f.write("AAPL\nMSFT\nGOOGL\n")
 
-# Only show these 3 options in Streamlit (no other files)
 WATCHLIST_CHOICES = [name.replace(".txt", "") for name in DEFAULT_LISTS]
-
-    
 RULES_FILE = "rules.json"
 
 # ---------------- INDICATORS ---------------- #
 def compute_indicators(df):
     """Compute technical indicators for a given dataframe."""
-    df["RSI"] = RSIIndicator(df["Close"].squeeze()).rsi()
+    df["RSI"] = RSIIndicator(df["Close"]).rsi()
     df["MA50"] = df["Close"].rolling(window=50).mean()
     df["MA200"] = df["Close"].rolling(window=200).mean()
     df["EMA20"] = EMAIndicator(df["Close"], window=20).ema_indicator()
@@ -42,7 +39,6 @@ def compute_indicators(df):
     boll = BollingerBands(df["Close"])
     df["Boll_Upper"] = boll.bollinger_hband()
     df["Boll_Lower"] = boll.bollinger_lband()
-
     return df
 
 
@@ -81,13 +77,19 @@ def save_watchlist(filename, tickers):
 # ---------------- STOCK ANALYSIS ---------------- #
 def analyze_stock(ticker, rules):
     try:
+        # Fix Yahoo Finance symbols (e.g., BRK-B -> BRK.B)
+        ticker = ticker.replace("-", ".")
         df = yf.download(ticker, period="6mo", progress=False)
         if df.empty:
             return None
 
+        # Normalize Close column
+        df["Close"] = df["Close"].squeeze()
+
         df = compute_indicators(df)
         latest = df.iloc[-1]
 
+        # Local vars for rule evaluation
         Price = latest["Close"]
         RSI = latest["RSI"]
         MA50 = latest["MA50"]
@@ -96,7 +98,6 @@ def analyze_stock(ticker, rules):
         MACD = latest["MACD"]
         MACD_Signal = latest["MACD_Signal"]
 
-        # Evaluate user rules
         try:
             if eval(rules["BUY"]):
                 signal = "🟢 BUY"
@@ -108,20 +109,21 @@ def analyze_stock(ticker, rules):
             signal = f"⚠️ Rule Error: {e}"
 
         return {
-            "Ticker": ticker,
+            "Ticker": ticker.replace(".", "-"),
             "Price": round(Price, 2),
             "RSI": round(RSI, 2),
             "MA50": round(MA50, 2),
             "MA200": round(MA200, 2),
+            "EMA20": round(EMA20, 2),
             "MACD": round(MACD, 2),
             "MACD_Signal": round(MACD_Signal, 2),
             "Signal": signal,
             "Link": f"https://finance.yahoo.com/quote/{ticker}"
         }
 
-    except Exception as e:
-        st.warning(f"Error analyzing {ticker}: {e}")
+    except Exception:
         return None
+
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
@@ -143,21 +145,21 @@ st.sidebar.header("⚙️ Customize Settings")
 
 # Select watchlist
 selected_watchlist = st.sidebar.selectbox("Choose a watchlist", WATCHLIST_CHOICES)
+symbols = load_watchlist(f"{selected_watchlist}.txt")
 
 # Manage symbols
-symbols = load_watchlist(f"{selected_watchlist}.txt")
 new_symbol = st.sidebar.text_input("➕ Add Symbol (e.g., AAPL)")
 
 if st.sidebar.button("Add Symbol"):
-    if new_symbol and new_symbol not in symbols:
+    if new_symbol and new_symbol.upper() not in symbols:
         symbols.append(new_symbol.upper())
-        save_watchlist(selected_watchlist, symbols)
+        save_watchlist(f"{selected_watchlist}.txt", symbols)
         st.sidebar.success(f"Added {new_symbol.upper()} to {selected_watchlist}")
 
 remove_symbol = st.sidebar.selectbox("🗑️ Remove Symbol", [""] + symbols)
 if st.sidebar.button("Remove Symbol") and remove_symbol:
     symbols.remove(remove_symbol)
-    save_watchlist(selected_watchlist, symbols)
+    save_watchlist(f"{selected_watchlist}.txt", symbols)
     st.sidebar.success(f"Removed {remove_symbol}")
 
 # Rules editor
@@ -172,21 +174,24 @@ if st.sidebar.button("💾 Save Rules"):
     save_rules(rules)
     st.sidebar.success("Rules saved successfully!")
 
+
 # ----- Analyze stocks -----
 if st.button("🔍 Analyze Watchlist"):
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
     results = []
+
     for ticker in symbols:
         res = analyze_stock(ticker, rules)
         if res:
             results.append(res)
+        else:
+            st.warning(f"⚠️ Could not analyze {ticker}")
 
     if results:
         df = pd.DataFrame(results)
         df["Ticker"] = df.apply(lambda x: f"[{x['Ticker']}]({x['Link']})", axis=1)
         df = df.drop(columns=["Link"])
 
-        # Apply colors
         def color_signal(val):
             if "BUY" in val:
                 return "background-color: #d4edda; color: green"
@@ -195,11 +200,12 @@ if st.button("🔍 Analyze Watchlist"):
             else:
                 return ""
 
-        styled = df.style.applymap(color_signal, subset=["Signal"])
-        st.dataframe(df[["Ticker", "Price", "RSI", "MA50", "Signal"]], use_container_width=True)
+        styled_df = df.style.applymap(color_signal, subset=["Signal"])
+        st.dataframe(styled_df, use_container_width=True)
     else:
-        st.warning("⚠️ No valid stock data found. Check tickers or rules.")
+        st.info("No valid data to display.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
+
 
 
