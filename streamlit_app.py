@@ -14,7 +14,7 @@ WATCHLIST_DIR = "watchlists"
 if not os.path.exists(WATCHLIST_DIR):
     os.makedirs(WATCHLIST_DIR)
 
-DEFAULT_LISTS = ["tech.txt", "growth.txt", "dividend.txt"]
+DEFAULT_LISTS = ["Watch_list", "wl_edgar", "wl_tiago"]
 
 # Ensure the three lists exist
 for filename in DEFAULT_LISTS:
