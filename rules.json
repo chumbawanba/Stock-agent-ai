@@ -1,0 +1,4 @@
+{
+  "BUY": "RSI < 30 and Price > MA50 and MACD > MACD_Signal",
+  "SELL": "RSI > 70 and Price < MA50 and MACD < MACD_Signal"
+}
