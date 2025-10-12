@@ -22,7 +22,6 @@ for filename in DEFAULT_LISTS:
             f.write("AAPL\nMSFT\nGOOGL\n")
     
 RULES_FILE = "rules.json"
-#os.makedirs(WATCHLIST_DIR, exist_ok=True)
 
 # ---------------- INDICATORS ---------------- #
 def compute_indicators(df):
@@ -194,9 +193,9 @@ if st.button("🔍 Analyze Watchlist"):
                 return ""
 
         styled = df.style.applymap(color_signal, subset=["Signal"])
-        st.dataframe(styled.to_html(escape=False), unsafe_allow_html=True)
-    else:
-        st.warning("No valid stock data found.")
+        st.dataframe(df[["Ticker", "Price", "RSI", "MA50", "Action"]], use_container_width=True)
+else:
+    st.info("No valid data to display.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
 
