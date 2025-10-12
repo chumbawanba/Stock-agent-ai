@@ -142,9 +142,7 @@ with st.expander("📘 Indicator Descriptions"):
 st.sidebar.header("⚙️ Customize Settings")
 
 # Select watchlist
-lists = [f.replace(".txt", "") for f in os.listdir(WATCHLIST_DIR) if f.endswith(".txt")]
-selected_watchlist = st.sidebar.selectbox("Choose a watchlist", lists)
-
+selected_watchlist = st.sidebar.selectbox("Choose a watchlist", WATCHLIST_CHOICES)
 
 # Manage symbols
 symbols = load_watchlist(f"{selected_watchlist}.txt")
