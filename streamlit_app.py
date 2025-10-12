@@ -142,7 +142,7 @@ lists = [f.replace(".txt", "") for f in os.listdir(WATCHLIST_DIR) if f.endswith(
 selected_watchlist = st.sidebar.selectbox("Choose a watchlist", lists)
 
 # Manage symbols
-symbols = load_watchlist(selected_watchlist)
+symbols = load_watchlist(f"{selected_watchlist}.txt")
 new_symbol = st.sidebar.text_input("➕ Add Symbol (e.g., AAPL)")
 
 if st.sidebar.button("Add Symbol"):
