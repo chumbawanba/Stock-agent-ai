@@ -16,7 +16,7 @@ DEFAULT_LISTS = ["Watch_list", "wl_edgar", "wl_tiago"]
 
 # Ensure the three lists exist
 for filename in DEFAULT_LISTS:
-    path = os.path.join(WATCHLIST_DIR, filename)
+    path = os.path.join(WATCHLIST_DIR, f"{filename}.txt")
     if not os.path.exists(path):
         with open(path, "w") as f:
             f.write("AAPL\nMSFT\nGOOGL\n")
@@ -115,9 +115,9 @@ def analyze_stock(ticker, rules):
             "Link": f"https://finance.yahoo.com/quote/{ticker}"
         }
 
-    except Exception:
+    except Exception as e:
+        st.warning(f"Error analyzing {ticker}: {e}")
         return None
-
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
@@ -138,7 +138,8 @@ with st.expander("📘 Indicator Descriptions"):
 st.sidebar.header("⚙️ Customize Settings")
 
 # Select watchlist
-selected_watchlist = st.sidebar.selectbox("Choose a watchlist", DEFAULT_LISTS)
+lists = [f.replace(".txt", "") for f in os.listdir(WATCHLIST_DIR) if f.endswith(".txt")]
+selected_watchlist = st.sidebar.selectbox("Choose a watchlist", lists)
 
 # Manage symbols
 symbols = load_watchlist(selected_watchlist)
