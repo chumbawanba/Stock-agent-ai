@@ -9,6 +9,18 @@ from ta.volatility import BollingerBands
 
 # ---------------- CONFIG ---------------- #
 WATCHLIST_DIR = "watchlists"
+if not os.path.exists(WATCHLIST_DIR):
+    os.makedirs(WATCHLIST_DIR)
+
+DEFAULT_LISTS = ["Watch_list", "wl_edgar", "wl_tiago"]
+
+# Ensure the three lists exist
+for filename in DEFAULT_LISTS:
+    path = os.path.join(WATCHLIST_DIR, filename)
+    if not os.path.exists(path):
+        with open(path, "w") as f:
+            f.write("AAPL\nMSFT\nGOOGL\n")
+    
 RULES_FILE = "rules.json"
 os.makedirs(WATCHLIST_DIR, exist_ok=True)
 
@@ -50,18 +62,17 @@ def save_rules(rules):
 
 
 # ---------------- WATCHLISTS ---------------- #
-def load_watchlist(name):
-    path = os.path.join(WATCHLIST_DIR, f"{name}.txt")
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            return [line.strip() for line in f if line.strip()]
-    return []
+def load_watchlist(filename):
+    path = os.path.join(WATCHLIST_DIR, filename)
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        return [line.strip().upper() for line in f if line.strip()]
 
-def save_watchlist(name, symbols):
-    path = os.path.join(WATCHLIST_DIR, f"{name}.txt")
+def save_watchlist(filename, tickers):
+    path = os.path.join(WATCHLIST_DIR, filename)
     with open(path, "w") as f:
-        for sym in symbols:
-            f.write(sym + "\n")
+        f.write("\n".join(sorted(set(tickers))))
 
 
 # ---------------- STOCK ANALYSIS ---------------- #
