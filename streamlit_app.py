@@ -219,7 +219,7 @@ if st.button("🔍 Analyze Watchlist"):
         df["Link"] = df["Link"].apply(lambda url: f"[🔗 Yahoo Finance]({url})")
 
        # Reorder columns for nice layout
-        df = df[["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "Signal", "Link"]]
+        df = df[["Signal", "Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "Signal", "Link"]]
 
        # Apply colors for Signal column
         def color_signal(val):
