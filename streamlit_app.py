@@ -146,15 +146,7 @@ def analyze_stock(ticker, rules):
         st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
         return None
 
-#----------
-if st.sidebar.button("🧪 Test yfinance"):
-    test_symbol = st.sidebar.text_input("Enter ticker to test", "MSFT")
-    df = yf.download(test_symbol, period="6mo", progress=False)
-    if df.empty:
-        st.error(f"No data returned for {test_symbol}")
-    else:
-        st.success(f"Downloaded {len(df)} rows for {test_symbol}")
-        st.write(df.tail())
+
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
 
