@@ -75,21 +75,26 @@ def save_watchlist(filename, tickers):
 
 
 # ---------------- STOCK ANALYSIS ---------------- #
+
 def analyze_stock(ticker, rules):
+    ticker_fixed = ticker.replace("-", ".").strip().upper()
     try:
-        # Fix Yahoo Finance symbols (e.g., BRK-B -> BRK.B)
-        ticker = ticker.replace("-", ".")
-        df = yf.download(ticker, period="6mo", progress=False)
+        st.write(f"🔍 Downloading data for {ticker_fixed}...")
+        df = yf.download(ticker_fixed, period="6mo", progress=False)
         if df.empty:
+            st.warning(f"⚠️ No data returned for {ticker_fixed}")
             return None
 
-        # Normalize Close column
-        df["Close"] = df["Close"].squeeze()
+        st.write(f"✅ Got {len(df)} rows for {ticker_fixed}")
+
+        # Ensure 1D arrays
+        if isinstance(df["Close"].values[0], (list, tuple)) or hasattr(df["Close"].values[0], "__len__"):
+            st.warning(f"⚠️ Close column for {ticker_fixed} is not 1D — fixing shape.")
+            df["Close"] = df["Close"].squeeze()
 
         df = compute_indicators(df)
         latest = df.iloc[-1]
 
-        # Local vars for rule evaluation
         Price = latest["Close"]
         RSI = latest["RSI"]
         MA50 = latest["MA50"]
@@ -98,6 +103,7 @@ def analyze_stock(ticker, rules):
         MACD = latest["MACD"]
         MACD_Signal = latest["MACD_Signal"]
 
+        # Evaluate user rules
         try:
             if eval(rules["BUY"]):
                 signal = "🟢 BUY"
@@ -109,7 +115,7 @@ def analyze_stock(ticker, rules):
             signal = f"⚠️ Rule Error: {e}"
 
         return {
-            "Ticker": ticker.replace(".", "-"),
+            "Ticker": ticker,
             "Price": round(Price, 2),
             "RSI": round(RSI, 2),
             "MA50": round(MA50, 2),
@@ -118,12 +124,12 @@ def analyze_stock(ticker, rules):
             "MACD": round(MACD, 2),
             "MACD_Signal": round(MACD_Signal, 2),
             "Signal": signal,
-            "Link": f"https://finance.yahoo.com/quote/{ticker}"
+            "Link": f"https://finance.yahoo.com/quote/{ticker_fixed}"
         }
 
-    except Exception:
+    except Exception as e:
+        st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
         return None
-
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
