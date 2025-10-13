@@ -12,7 +12,7 @@ WATCHLIST_DIR = "watchlists"
 if not os.path.exists(WATCHLIST_DIR):
     os.makedirs(WATCHLIST_DIR)
 
-DEFAULT_LISTS = ["Watch_list.txt", "wl_edgar.txt", "wl_tiago.txt"]
+DEFAULT_LISTS = ["wl_default.txt", "wl_edgar.txt", "wl_tiago.txt"]
 
 # Ensure the three lists exist
 for filename in DEFAULT_LISTS:
