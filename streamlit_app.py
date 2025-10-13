@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 import json
 import os
+import matplotlib.pyplot as plt
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator
 from ta.volatility import BollingerBands
@@ -250,7 +251,6 @@ if st.button("🔍 Analyze Watchlist"):
         selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist())
 
         if selected_ticker:
-            import matplotlib.pyplot as plt
 
             data = yf.download(selected_ticker, period="1y", progress=False)
             if not data.empty:
