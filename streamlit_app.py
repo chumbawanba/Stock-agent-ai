@@ -91,57 +91,91 @@ def save_watchlist(filename, tickers):
 
 # ---------------- STOCK ANALYSIS ---------------- #
 
-def analyze_stock(ticker, rules):
-    ticker_fixed = ticker.replace("-", ".").strip().upper()
-    try:
-        df = yf.download(ticker_fixed, period="6mo", progress=False)
-        if df.empty:
-            st.warning(f"⚠️ No data returned for {ticker_fixed}")
-            return None
+# ----- Analyze stocks -----
+if st.button("🔍 Analyze Watchlist"):
+    st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
+    results = []
+    for ticker in symbols:
+        res = analyze_stock(ticker, rules)
+        if res:
+            results.append(res)
+        else:
+            st.warning(f"⚠️ Could not analyze {ticker}")
 
+    if results:
+        df = pd.DataFrame(results)
 
-        # Ensure 1D arrays
-        if isinstance(df["Close"].values[0], (list, tuple)) or hasattr(df["Close"].values[0], "__len__"):
-            df["Close"] = df["Close"].squeeze()
+        # Format numbers
+        df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
+        for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
+            df[col] = df[col].apply(lambda x: f"{x:.2f}")
 
-        df = compute_indicators(df)
-        latest = df.iloc[-1]
+        # Move Yahoo link to last column
+        df["Yahoo Link"] = df["Link"].apply(lambda l: f"[Open]({l})")
+        df = df.drop(columns=["Link"])
 
-        Price = latest["Close"]
-        RSI = latest["RSI"]
-        MA50 = latest["MA50"]
-        MA200 = latest["MA200"]
-        EMA20 = latest["EMA20"]
-        MACD = latest["MACD"]
-        MACD_Signal = latest["MACD_Signal"]
+        # Reorder columns for readability
+        df = df[
+            ["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
+        ]
 
-        # Evaluate user rules
-        try:
-            if eval(rules["BUY"]):
-                signal = "🟢 BUY"
-            elif eval(rules["SELL"]):
-                signal = "🔴 SELL"
+        # Apply signal colors
+        def color_signal(val):
+            if "BUY" in val:
+                return "background-color: #d4edda; color: green; font-weight: bold"
+            elif "SELL" in val:
+                return "background-color: #f8d7da; color: red; font-weight: bold"
             else:
-                signal = "⚪ HOLD"
-        except Exception as e:
-            signal = f"⚠️ Rule Error: {e}"
+                return "background-color: #f0f0f0; color: gray"
 
-        return {
-            "Ticker": ticker,
-            "Price": round(Price, 2),
-            "RSI": round(RSI, 2),
-            "MA50": round(MA50, 2),
-            "MA200": round(MA200, 2),
-            "EMA20": round(EMA20, 2),
-            "MACD": round(MACD, 2),
-            "MACD_Signal": round(MACD_Signal, 2),
-            "Signal": signal,
-            "Link": f"https://finance.yahoo.com/quote/{ticker_fixed}"
-        }
+        styled = (
+            df.style
+            .applymap(color_signal, subset=["Signal"])
+            .set_properties(
+                **{
+                    "text-align": "center",
+                    "border": "1px solid #ddd",
+                    "padding": "6px",
+                }
+            )
+        )
 
-    except Exception as e:
-        st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
-        return None
+        st.markdown("### 📋 Analysis Results")
+        st.dataframe(df, use_container_width=True)
+
+        # --- Interactive Chart Section ---
+        st.markdown("---")
+        st.subheader("📈 View Stock Chart")
+
+        selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist())
+
+        if selected_ticker:
+            import matplotlib.pyplot as plt
+
+            data = yf.download(selected_ticker, period="1y", progress=False)
+            if not data.empty:
+                # Compute indicators for chart
+                data["MA50"] = data["Close"].rolling(window=50).mean()
+                data["MA200"] = data["Close"].rolling(window=200).mean()
+
+                st.markdown(f"### {selected_ticker} — Price with MA50 / MA200")
+                fig, ax = plt.subplots(figsize=(10, 4))
+                ax.plot(data.index, data["Close"], label="Close", linewidth=1.8)
+                ax.plot(data.index, data["MA50"], label="MA50", linestyle="--")
+                ax.plot(data.index, data["MA200"], label="MA200", linestyle=":")
+                ax.set_title(f"{selected_ticker} Price Trend")
+                ax.legend()
+                ax.grid(True)
+                st.pyplot(fig)
+
+                st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
+
+            else:
+                st.warning("⚠️ No price data found for selected ticker.")
+    else:
+        st.info("No valid data to display.")
+else:
+    st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
 
 
 # ---------------- STREAMLIT UI ---------------- #
