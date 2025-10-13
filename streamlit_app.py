@@ -224,11 +224,11 @@ if st.button("🔍 Analyze Watchlist"):
        # Apply colors for Signal column
         def color_signal(val):
            if "BUY" in val:
-        return "background-color: #d4edda; color: green"
+           return "background-color: #d4edda; color: green"
            elif "SELL" in val:
-        return "background-color: #f8d7da; color: red"
+           return "background-color: #f8d7da; color: red"
            else:
-        return "background-color: #f0f0f0; color: gray"
+           return "background-color: #f0f0f0; color: gray"
 
        # Show styled dataframe with clickable link
         styled = df.style.applymap(color_signal, subset=["Signal"])
