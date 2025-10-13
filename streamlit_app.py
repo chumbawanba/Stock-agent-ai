@@ -94,17 +94,14 @@ def save_watchlist(filename, tickers):
 def analyze_stock(ticker, rules):
     ticker_fixed = ticker.replace("-", ".").strip().upper()
     try:
-        st.write(f"🔍 Downloading data for {ticker_fixed}...")
         df = yf.download(ticker_fixed, period="6mo", progress=False)
         if df.empty:
             st.warning(f"⚠️ No data returned for {ticker_fixed}")
             return None
 
-        st.write(f"✅ Got {len(df)} rows for {ticker_fixed}")
 
         # Ensure 1D arrays
         if isinstance(df["Close"].values[0], (list, tuple)) or hasattr(df["Close"].values[0], "__len__"):
-            st.warning(f"⚠️ Close column for {ticker_fixed} is not 1D — fixing shape.")
             df["Close"] = df["Close"].squeeze()
 
         df = compute_indicators(df)
@@ -153,14 +150,7 @@ st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
 st.title("💹 AlphaLayer — Smarter Stock Insights")
 st.markdown("### An augmented knowledge layer for data-driven investors.")
 
-with st.expander("📘 Indicator Descriptions"):
-    st.markdown("""
-    **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
-    **MA50 / MA200:** Moving averages — help identify short-term and long-term trends.  
-    **EMA20:** Exponential moving average, more sensitive to recent prices.  
-    **MACD:** Momentum indicator comparing two EMAs; helps detect trend changes.  
-    **Bollinger Bands:** Measure volatility; prices near lower band may be undervalued.
-    """)
+
 
 # ----- Sidebar Controls -----
 st.sidebar.header("⚙️ Customize Settings")
@@ -242,3 +232,12 @@ if st.button("🔍 Analyze Watchlist"):
         st.info("No valid data to display.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
+
+with st.expander("📘 Indicator Descriptions"):
+    st.markdown("""
+    **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
+    **MA50 / MA200:** Moving averages — help identify short-term and long-term trends.  
+    **EMA20:** Exponential moving average, more sensitive to recent prices.  
+    **MACD:** Momentum indicator comparing two EMAs; helps detect trend changes.  
+    **Bollinger Bands:** Measure volatility; prices near lower band may be undervalued.
+    """)
