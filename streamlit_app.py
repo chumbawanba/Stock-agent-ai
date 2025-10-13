@@ -26,19 +26,34 @@ RULES_FILE = "rules.json"
 
 # ---------------- INDICATORS ---------------- #
 def compute_indicators(df):
-    """Compute technical indicators for a given dataframe."""
-    df["RSI"] = RSIIndicator(df["Close"]).rsi()
-    df["MA50"] = df["Close"].rolling(window=50).mean()
-    df["MA200"] = df["Close"].rolling(window=200).mean()
-    df["EMA20"] = EMAIndicator(df["Close"], window=20).ema_indicator()
+    """Compute technical indicators for a given dataframe safely."""
+    # Ensure Close column is a clean 1D Series
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [col[0] for col in df.columns]  # flatten MultiIndex
 
-    macd = MACD(df["Close"])
+    if "Close" not in df.columns:
+        raise ValueError("Missing 'Close' column in DataFrame")
+
+    close = df["Close"]
+
+    # If Close is 2D (e.g., [[100],[101],...]) => flatten to 1D
+    if hasattr(close.values[0], "__len__") and not isinstance(close.values[0], (float, int)):
+        close = pd.Series(close.squeeze(), index=df.index)
+
+    # Compute indicators
+    df["RSI"] = RSIIndicator(close).rsi()
+    df["MA50"] = close.rolling(window=50).mean()
+    df["MA200"] = close.rolling(window=200).mean()
+    df["EMA20"] = EMAIndicator(close, window=20).ema_indicator()
+
+    macd = MACD(close)
     df["MACD"] = macd.macd()
     df["MACD_Signal"] = macd.macd_signal()
 
-    boll = BollingerBands(df["Close"])
+    boll = BollingerBands(close)
     df["Boll_Upper"] = boll.bollinger_hband()
     df["Boll_Lower"] = boll.bollinger_lband()
+
     return df
 
 
