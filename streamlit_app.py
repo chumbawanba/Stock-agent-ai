@@ -222,17 +222,17 @@ if st.button("🔍 Analyze Watchlist"):
         df = df[["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "Signal", "Link"]]
 
        # Apply colors for Signal column
-       def color_signal(val):
-         if "BUY" in val:
+        def color_signal(val):
+           if "BUY" in val:
         return "background-color: #d4edda; color: green"
-         elif "SELL" in val:
+           elif "SELL" in val:
         return "background-color: #f8d7da; color: red"
-         else:
+           else:
         return "background-color: #f0f0f0; color: gray"
 
        # Show styled dataframe with clickable link
-       styled = df.style.applymap(color_signal, subset=["Signal"])
-       st.write(styled.to_html(escape=False), unsafe_allow_html=True)
+        styled = df.style.applymap(color_signal, subset=["Signal"])
+        st.write(styled.to_html(escape=False), unsafe_allow_html=True)
 
         st.dataframe(df.style.applymap(color_signal, subset=["Signal"]), use_container_width=True)
     else:
