@@ -175,10 +175,14 @@ if st.sidebar.button("💾 Save Rules"):
     st.sidebar.success("Rules saved successfully!")
 
 
-# ----- Analyze stocks -----
+import time
+
+FAILED_LOG = "failed_tickers.txt"
+
 if st.button("🔍 Analyze Watchlist"):
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
     results = []
+    failed_tickers = []
 
     for ticker in symbols:
         res = analyze_stock(ticker, rules)
@@ -186,12 +190,23 @@ if st.button("🔍 Analyze Watchlist"):
             results.append(res)
         else:
             st.warning(f"⚠️ Could not analyze {ticker}")
+            failed_tickers.append(ticker)
+        time.sleep(1)  # Prevent Yahoo throttling
 
+    # Save failed tickers to file
+    if failed_tickers:
+        with open(FAILED_LOG, "a") as f:
+            for ft in failed_tickers:
+                f.write(f"{ft}\n")
+        st.info(f"📝 Logged {len(failed_tickers)} failed tickers to `{FAILED_LOG}`")
+
+    # Display results
     if results:
         df = pd.DataFrame(results)
         df["Ticker"] = df.apply(lambda x: f"[{x['Ticker']}]({x['Link']})", axis=1)
         df = df.drop(columns=["Link"])
 
+        # Apply colors
         def color_signal(val):
             if "BUY" in val:
                 return "background-color: #d4edda; color: green"
@@ -200,12 +215,8 @@ if st.button("🔍 Analyze Watchlist"):
             else:
                 return ""
 
-        styled_df = df.style.applymap(color_signal, subset=["Signal"])
-        st.dataframe(styled_df, use_container_width=True)
+        st.dataframe(df.style.applymap(color_signal, subset=["Signal"]), use_container_width=True)
     else:
         st.info("No valid data to display.")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
-
-
-
