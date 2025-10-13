@@ -234,7 +234,7 @@ if st.button("🔍 Analyze Watchlist"):
         styled = df.style.applymap(color_signal, subset=["Signal"])
         st.write(styled.to_html(escape=False), unsafe_allow_html=True)
 
-        st.dataframe(df.style.applymap(color_signal, subset=["Signal"]), use_container_width=True)
+        #st.dataframe(df.style.applymap(color_signal, subset=["Signal"]), use_container_width=True)
     else:
         st.info("No valid data to display.")
 else:
