@@ -192,9 +192,15 @@ import time
 
 FAILED_LOG = "failed_tickers.txt"
 
+# --- Initialize session state safely ---
+if "analyzed_data" not in st.session_state:
+    st.session_state["analyzed_data"] = pd.DataFrame()
+if "selected_watchlist" not in st.session_state:
+    st.session_state["selected_watchlist"] = None
+
 # ----- Analyze stocks -----
 if st.button("🔍 Analyze Watchlist"):
-    st.session_state["analyzed_data"] = []  # Reset stored results
+    st.session_state["analyzed_data"] = pd.DataFrame()  # Reset
     st.session_state["selected_watchlist"] = selected_watchlist
 
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
@@ -208,9 +214,11 @@ if st.button("🔍 Analyze Watchlist"):
 
     if results:
         st.session_state["analyzed_data"] = pd.DataFrame(results)
+    else:
+        st.info("No valid data to display.")
 
 # --- Display cached results ---
-if "analyzed_data" in st.session_state and not st.session_state["analyzed_data"].empty:
+if not st.session_state["analyzed_data"].empty:
     df = st.session_state["analyzed_data"].copy()
 
     # Format columns
@@ -233,20 +241,21 @@ if "analyzed_data" in st.session_state and not st.session_state["analyzed_data"]
         else:
             return "background-color: #f0f0f0; color: gray"
 
-    styled = (
-        df.style
-        .applymap(color_signal, subset=["Signal"])
-        .set_properties(**{"text-align": "center", "border": "1px solid #ddd", "padding": "6px"})
-    )
-
     st.markdown("### 📋 Analysis Results")
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(
+        df.style.applymap(color_signal, subset=["Signal"]),
+        use_container_width=True
+    )
 
     # --- Chart section ---
     st.markdown("---")
     st.subheader("📈 View Stock Chart")
 
-    selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist(), key="chart_select")
+    selected_ticker = st.selectbox(
+        "Choose a stock to view chart:",
+        df["Ticker"].tolist(),
+        key="chart_select"
+    )
 
     if selected_ticker:
         import matplotlib.pyplot as plt
