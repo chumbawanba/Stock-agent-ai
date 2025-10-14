@@ -3,7 +3,9 @@ import pandas as pd
 import yfinance as yf
 import json
 import os
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pl
+import io
+import base64
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator
 from ta.volatility import BollingerBands
@@ -144,6 +146,23 @@ def analyze_stock(ticker, rules):
         st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
         return None
 
+def make_sparkline(ticker):
+    """Create a small price trend plot as base64 image for embedding in table."""
+    data = yf.download(ticker, period="3mo", progress=False)
+    if data.empty:
+        return ""
+    
+    fig, ax = plt.subplots(figsize=(2.5, 0.6))
+    ax.plot(data.index, data["Close"], linewidth=1.2, color="steelblue")
+    ax.axis("off")
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+    buf.seek(0)
+    img_b64 = base64.b64encode(buf.read()).decode()
+    return f'<img src="data:image/png;base64,{img_b64}" width="100"/>'
+
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
@@ -206,6 +225,23 @@ if st.button("🔍 Analyze Watchlist"):
     if results:
         df = pd.DataFrame(results)
 
+        # Add small chart image
+        st.text("Generating price trend previews...")
+        df["Trend"] = df["Ticker"].apply(lambda t: make_sparkline(t))
+        
+        # Format numbers
+        df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
+        for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
+            df[col] = df[col].apply(lambda x: f"{x:.2f}")
+        
+        # Move Yahoo link to last column
+        df["Yahoo Link"] = df["Link"].apply(lambda l: f'<a href="{l}" target="_blank">🔗 Open</a>')
+        df = df.drop(columns=["Link"])
+        
+        # Reorder columns
+        df = df[
+            ["Ticker", "Trend", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
+        ]
         # Format numbers
         df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
         for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
@@ -242,8 +278,10 @@ if st.button("🔍 Analyze Watchlist"):
         )
 
         st.markdown("### 📋 Analysis Results")
-        st.dataframe(df, use_container_width=True)
-
+        st.markdown(
+            "<style>table {width:100%; border-collapse:collapse;} th, td {padding:8px; text-align:center;} tr:nth-child(even){background:#f9f9f9;} </style>",
+            unsafe_allow_html=True
+        )
         # --- Interactive Chart Section ---
         st.markdown("---")
         st.subheader("📈 View Stock Chart")
