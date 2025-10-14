@@ -278,6 +278,7 @@ if not st.session_state["analyzed_data"].empty:
             st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
+
     
 with st.expander("📘 Indicator Descriptions"):
     st.markdown("""
