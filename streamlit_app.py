@@ -3,9 +3,9 @@ import pandas as pd
 import yfinance as yf
 import json
 import os
-import matplotlib.pyplot as pl
 import io
 import base64
+import matplotlib.pyplot as plt
 from ta.momentum import RSIIndicator
 from ta.trend import MACD, EMAIndicator
 from ta.volatility import BollingerBands
@@ -27,23 +27,20 @@ for filename in DEFAULT_LISTS:
 WATCHLIST_CHOICES = [name.replace(".txt", "") for name in DEFAULT_LISTS]
 RULES_FILE = "rules.json"
 
+
 # ---------------- INDICATORS ---------------- #
 def compute_indicators(df):
     """Compute technical indicators for a given dataframe safely."""
-    # Ensure Close column is a clean 1D Series
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [col[0] for col in df.columns]  # flatten MultiIndex
+        df.columns = [col[0] for col in df.columns]
 
     if "Close" not in df.columns:
         raise ValueError("Missing 'Close' column in DataFrame")
 
     close = df["Close"]
-
-    # If Close is 2D (e.g., [[100],[101],...]) => flatten to 1D
     if hasattr(close.values[0], "__len__") and not isinstance(close.values[0], (float, int)):
         close = pd.Series(close.squeeze(), index=df.index)
 
-    # Compute indicators
     df["RSI"] = RSIIndicator(close).rsi()
     df["MA50"] = close.rolling(window=50).mean()
     df["MA200"] = close.rolling(window=200).mean()
@@ -73,6 +70,7 @@ def load_rules():
         save_rules(default_rules)
         return default_rules
 
+
 def save_rules(rules):
     with open(RULES_FILE, "w") as f:
         json.dump(rules, f, indent=2)
@@ -86,14 +84,35 @@ def load_watchlist(filename):
     with open(path) as f:
         return [line.strip().upper() for line in f if line.strip()]
 
+
 def save_watchlist(filename, tickers):
     path = os.path.join(WATCHLIST_DIR, filename)
     with open(path, "w") as f:
         f.write("\n".join(sorted(set(tickers))))
 
 
-# ---------------- STOCK ANALYSIS ---------------- #
+# ---------------- MINI CHART (SPARKLINE) ---------------- #
+def make_sparkline(ticker):
+    """Create a small price trend plot as base64 image for embedding in table."""
+    try:
+        data = yf.download(ticker, period="3mo", progress=False)
+        if data.empty:
+            return ""
+        fig, ax = plt.subplots(figsize=(2.5, 0.6))
+        ax.plot(data.index, data["Close"], linewidth=1.2, color="steelblue")
+        ax.axis("off")
 
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+        plt.close(fig)
+        buf.seek(0)
+        img_b64 = base64.b64encode(buf.read()).decode()
+        return f'<img src="data:image/png;base64,{img_b64}" width="100"/>'
+    except Exception:
+        return ""
+
+
+# ---------------- STOCK ANALYSIS ---------------- #
 def analyze_stock(ticker, rules):
     ticker_fixed = ticker.replace("-", ".").strip().upper()
     try:
@@ -102,8 +121,6 @@ def analyze_stock(ticker, rules):
             st.warning(f"⚠️ No data returned for {ticker_fixed}")
             return None
 
-
-        # Ensure 1D arrays
         if isinstance(df["Close"].values[0], (list, tuple)) or hasattr(df["Close"].values[0], "__len__"):
             df["Close"] = df["Close"].squeeze()
 
@@ -130,7 +147,7 @@ def analyze_stock(ticker, rules):
             signal = f"⚠️ Rule Error: {e}"
 
         return {
-            "Ticker": ticker,
+            "Ticker": ticker_fixed,
             "Price": round(Price, 2),
             "RSI": round(RSI, 2),
             "MA50": round(MA50, 2),
@@ -146,23 +163,6 @@ def analyze_stock(ticker, rules):
         st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
         return None
 
-def make_sparkline(ticker):
-    """Create a small price trend plot as base64 image for embedding in table."""
-    data = yf.download(ticker, period="3mo", progress=False)
-    if data.empty:
-        return ""
-    
-    fig, ax = plt.subplots(figsize=(2.5, 0.6))
-    ax.plot(data.index, data["Close"], linewidth=1.2, color="steelblue")
-    ax.axis("off")
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-    plt.close(fig)
-    buf.seek(0)
-    img_b64 = base64.b64encode(buf.read()).decode()
-    return f'<img src="data:image/png;base64,{img_b64}" width="100"/>'
-
 
 # ---------------- STREAMLIT UI ---------------- #
 st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
@@ -170,9 +170,7 @@ st.set_page_config(page_title="AlphaLayer", page_icon="💹", layout="wide")
 st.title("💹 AlphaLayer — Smarter Stock Insights")
 st.markdown("### An augmented knowledge layer for data-driven investors.")
 
-
-
-# ----- Sidebar Controls -----
+# ----- Sidebar Controls ----- #
 st.sidebar.header("⚙️ Customize Settings")
 
 # Select watchlist
@@ -181,7 +179,6 @@ symbols = load_watchlist(f"{selected_watchlist}.txt")
 
 # Manage symbols
 new_symbol = st.sidebar.text_input("➕ Add Symbol (e.g., AAPL)")
-
 if st.sidebar.button("Add Symbol"):
     if new_symbol and new_symbol.upper() not in symbols:
         symbols.append(new_symbol.upper())
@@ -199,19 +196,13 @@ rules = load_rules()
 st.sidebar.subheader("🧠 Trading Rules")
 buy_rule = st.sidebar.text_area("BUY Rule", value=rules["BUY"], height=80)
 sell_rule = st.sidebar.text_area("SELL Rule", value=rules["SELL"], height=80)
-
 if st.sidebar.button("💾 Save Rules"):
     rules["BUY"] = buy_rule
     rules["SELL"] = sell_rule
     save_rules(rules)
     st.sidebar.success("Rules saved successfully!")
 
-
-import time
-
-FAILED_LOG = "failed_tickers.txt"
-
-# ----- Analyze stocks -----
+# ----- Analyze Stocks ----- #
 if st.button("🔍 Analyze Watchlist"):
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
     results = []
@@ -225,38 +216,23 @@ if st.button("🔍 Analyze Watchlist"):
     if results:
         df = pd.DataFrame(results)
 
-        # Add small chart image
-        st.text("Generating price trend previews...")
+        # Add sparklines
+        st.text("Generating trend previews...")
         df["Trend"] = df["Ticker"].apply(lambda t: make_sparkline(t))
-        
-        # Format numbers
+
+        # Format numeric values
         df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
         for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
             df[col] = df[col].apply(lambda x: f"{x:.2f}")
-        
-        # Move Yahoo link to last column
+
+        # Add Yahoo links
         df["Yahoo Link"] = df["Link"].apply(lambda l: f'<a href="{l}" target="_blank">🔗 Open</a>')
         df = df.drop(columns=["Link"])
-        
+
         # Reorder columns
-        df = df[
-            ["Ticker", "Trend", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
-        ]
-        # Format numbers
-        df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
-        for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
-            df[col] = df[col].apply(lambda x: f"{x:.2f}")
+        df = df[["Ticker", "Trend", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]]
 
-        # Move Yahoo link to last column
-        df["Yahoo Link"] = df["Link"].apply(lambda l: f"[Open]({l})")
-        df = df.drop(columns=["Link"])
-
-        # Reorder columns for readability
-        df = df[
-            ["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
-        ]
-
-        # Apply signal colors
+        # Color-coded signals
         def color_signal(val):
             if "BUY" in val:
                 return "background-color: #d4edda; color: green; font-weight: bold"
@@ -265,51 +241,14 @@ if st.button("🔍 Analyze Watchlist"):
             else:
                 return "background-color: #f0f0f0; color: gray"
 
-        styled = (
-            df.style
-            .applymap(color_signal, subset=["Signal"])
-            .set_properties(
-                **{
-                    "text-align": "center",
-                    "border": "1px solid #ddd",
-                    "padding": "6px",
-                }
-            )
-        )
+        styled_html = df.to_html(escape=False, index=False)
+        styled_html = styled_html.replace("<td>🟢 BUY</td>", '<td style="background:#d4edda; color:green; font-weight:bold;">🟢 BUY</td>')
+        styled_html = styled_html.replace("<td>🔴 SELL</td>", '<td style="background:#f8d7da; color:red; font-weight:bold;">🔴 SELL</td>')
+        styled_html = styled_html.replace("<td>⚪ HOLD</td>", '<td style="background:#f0f0f0; color:gray; font-weight:bold;">⚪ HOLD</td>')
 
         st.markdown("### 📋 Analysis Results")
-        st.markdown(
-            "<style>table {width:100%; border-collapse:collapse;} th, td {padding:8px; text-align:center;} tr:nth-child(even){background:#f9f9f9;} </style>",
-            unsafe_allow_html=True
-        )
-        # --- Interactive Chart Section ---
-        st.markdown("---")
-        st.subheader("📈 View Stock Chart")
-
-        selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist())
-
-        if selected_ticker:
-
-            data = yf.download(selected_ticker, period="1y", progress=False)
-            if not data.empty:
-                # Compute indicators for chart
-                data["MA50"] = data["Close"].rolling(window=50).mean()
-                data["MA200"] = data["Close"].rolling(window=200).mean()
-
-                st.markdown(f"### {selected_ticker} — Price with MA50 / MA200")
-                fig, ax = plt.subplots(figsize=(10, 4))
-                ax.plot(data.index, data["Close"], label="Close", linewidth=1.8)
-                ax.plot(data.index, data["MA50"], label="MA50", linestyle="--")
-                ax.plot(data.index, data["MA200"], label="MA200", linestyle=":")
-                ax.set_title(f"{selected_ticker} Price Trend")
-                ax.legend()
-                ax.grid(True)
-                st.pyplot(fig)
-
-                st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
-
-            else:
-                st.warning("⚠️ No price data found for selected ticker.")
+        st.markdown("<style>table {width:100%; border-collapse:collapse;} th, td {padding:8px; text-align:center;} tr:nth-child(even){background:#f9f9f9;}</style>", unsafe_allow_html=True)
+        st.markdown(styled_html, unsafe_allow_html=True)
     else:
         st.info("No valid data to display.")
 else:
@@ -323,3 +262,4 @@ with st.expander("📘 Indicator Descriptions"):
     **MACD:** Momentum indicator comparing two EMAs; helps detect trend changes.  
     **Bollinger Bands:** Measure volatility; prices near lower band may be undervalued.
     """)
+
