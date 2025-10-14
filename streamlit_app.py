@@ -194,89 +194,82 @@ FAILED_LOG = "failed_tickers.txt"
 
 # ----- Analyze stocks -----
 if st.button("🔍 Analyze Watchlist"):
+    st.session_state["analyzed_data"] = []  # Reset stored results
+    st.session_state["selected_watchlist"] = selected_watchlist
+
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
     results = []
-    for ticker in symbols:
-        res = analyze_stock(ticker, rules)
+    for ticker in load_watchlist(selected_watchlist):
+        res = analyze_stock(ticker, load_rules())
         if res:
             results.append(res)
         else:
             st.warning(f"⚠️ Could not analyze {ticker}")
 
     if results:
-        df = pd.DataFrame(results)
+        st.session_state["analyzed_data"] = pd.DataFrame(results)
 
-        # Format numbers
-        df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
-        for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
-            df[col] = df[col].apply(lambda x: f"{x:.2f}")
+# --- Display cached results ---
+if "analyzed_data" in st.session_state and not st.session_state["analyzed_data"].empty:
+    df = st.session_state["analyzed_data"].copy()
 
-        # Move Yahoo link to last column
-        df["Yahoo Link"] = df["Link"].apply(lambda l: f"[Open]({l})")
-        df = df.drop(columns=["Link"])
+    # Format columns
+    df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
+    for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
+        df[col] = df[col].apply(lambda x: f"{x:.2f}")
+    df["Yahoo Link"] = df["Link"].apply(lambda l: f"[Open]({l})")
+    df = df.drop(columns=["Link"])
 
-        # Reorder columns for readability
-        df = df[
-            ["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
-        ]
+    df = df[
+        ["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
+    ]
 
-        # Apply signal colors
-        def color_signal(val):
-            if "BUY" in val:
-                return "background-color: #d4edda; color: green; font-weight: bold"
-            elif "SELL" in val:
-                return "background-color: #f8d7da; color: red; font-weight: bold"
-            else:
-                return "background-color: #f0f0f0; color: gray"
+    # Color signals
+    def color_signal(val):
+        if "BUY" in val:
+            return "background-color: #d4edda; color: green; font-weight: bold"
+        elif "SELL" in val:
+            return "background-color: #f8d7da; color: red; font-weight: bold"
+        else:
+            return "background-color: #f0f0f0; color: gray"
 
-        styled = (
-            df.style
-            .applymap(color_signal, subset=["Signal"])
-            .set_properties(
-                **{
-                    "text-align": "center",
-                    "border": "1px solid #ddd",
-                    "padding": "6px",
-                }
-            )
-        )
+    styled = (
+        df.style
+        .applymap(color_signal, subset=["Signal"])
+        .set_properties(**{"text-align": "center", "border": "1px solid #ddd", "padding": "6px"})
+    )
 
-        st.markdown("### 📋 Analysis Results")
-        st.dataframe(df, use_container_width=True)
+    st.markdown("### 📋 Analysis Results")
+    st.dataframe(df, use_container_width=True)
 
-        # --- Interactive Chart Section ---
-        st.markdown("---")
-        st.subheader("📈 View Stock Chart")
+    # --- Chart section ---
+    st.markdown("---")
+    st.subheader("📈 View Stock Chart")
 
-        selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist())
+    selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist(), key="chart_select")
 
-        if selected_ticker:
+    if selected_ticker:
+        import matplotlib.pyplot as plt
 
-            data = yf.download(selected_ticker, period="1y", progress=False)
-            if not data.empty:
-                # Compute indicators for chart
-                data["MA50"] = data["Close"].rolling(window=50).mean()
-                data["MA200"] = data["Close"].rolling(window=200).mean()
+        data = yf.download(selected_ticker, period="1y", progress=False)
+        if not data.empty:
+            data["MA50"] = data["Close"].rolling(window=50).mean()
+            data["MA200"] = data["Close"].rolling(window=200).mean()
 
-                st.markdown(f"### {selected_ticker} — Price with MA50 / MA200")
-                fig, ax = plt.subplots(figsize=(10, 4))
-                ax.plot(data.index, data["Close"], label="Close", linewidth=1.8)
-                ax.plot(data.index, data["MA50"], label="MA50", linestyle="--")
-                ax.plot(data.index, data["MA200"], label="MA200", linestyle=":")
-                ax.set_title(f"{selected_ticker} Price Trend")
-                ax.legend()
-                ax.grid(True)
-                st.pyplot(fig)
+            st.markdown(f"### {selected_ticker} — Price with MA50 / MA200")
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(data.index, data["Close"], label="Close", linewidth=1.8)
+            ax.plot(data.index, data["MA50"], label="MA50", linestyle="--")
+            ax.plot(data.index, data["MA200"], label="MA200", linestyle=":")
+            ax.set_title(f"{selected_ticker} Price Trend")
+            ax.legend()
+            ax.grid(True)
+            st.pyplot(fig)
 
-                st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
-
-            else:
-                st.warning("⚠️ No price data found for selected ticker.")
-    else:
-        st.info("No valid data to display.")
+            st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
-
+    
 with st.expander("📘 Indicator Descriptions"):
     st.markdown("""
     **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
