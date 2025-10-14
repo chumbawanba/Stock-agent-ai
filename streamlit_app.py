@@ -93,26 +93,28 @@ def save_watchlist(filename, tickers):
 # ---------------- STOCK ANALYSIS ---------------- #
 
 def analyze_stock(ticker, rules):
-    ticker_fixed = ticker.replace("-", ".").strip().upper()
     try:
-        df = yf.download(ticker_fixed, period="6mo", progress=False)
+        df = yf.download(ticker, period="6mo", progress=False)
         if df.empty:
-            st.warning(f"⚠️ No data returned for {ticker_fixed}")
+            st.warning(f"⚠️ No data for {ticker}")
             return None
 
+        # Fix possible 2D array issues
+        df["Close"] = df["Close"].squeeze()
 
-        # Ensure 1D arrays
-        if isinstance(df["Close"].values[0], (list, tuple)) or hasattr(df["Close"].values[0], "__len__"):
-            df["Close"] = df["Close"].squeeze()
+        # Compute indicators
+        try:
+            df = compute_indicators(df)
+        except Exception as e:
+            st.error(f"⚠️ Error computing indicators for {ticker}: {e}")
+            return None
 
-        df = compute_indicators(df)
         latest = df.iloc[-1]
 
         Price = latest["Close"]
         RSI = latest["RSI"]
         MA50 = latest["MA50"]
         MA200 = latest["MA200"]
-        EMA20 = latest["EMA20"]
         MACD = latest["MACD"]
         MACD_Signal = latest["MACD_Signal"]
 
@@ -133,15 +135,14 @@ def analyze_stock(ticker, rules):
             "RSI": round(RSI, 2),
             "MA50": round(MA50, 2),
             "MA200": round(MA200, 2),
-            "EMA20": round(EMA20, 2),
             "MACD": round(MACD, 2),
             "MACD_Signal": round(MACD_Signal, 2),
             "Signal": signal,
-            "Link": f"https://finance.yahoo.com/quote/{ticker_fixed}"
+            "Link": f"https://finance.yahoo.com/quote/{ticker}"
         }
 
     except Exception as e:
-        st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
+        st.error(f"Error analyzing {ticker}: {e}")
         return None
 
 
