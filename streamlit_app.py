@@ -93,28 +93,26 @@ def save_watchlist(filename, tickers):
 # ---------------- STOCK ANALYSIS ---------------- #
 
 def analyze_stock(ticker, rules):
+    ticker_fixed = ticker.replace("-", ".").strip().upper()
     try:
-        df = yf.download(ticker, period="6mo", progress=False)
+        df = yf.download(ticker_fixed, period="6mo", progress=False)
         if df.empty:
-            st.warning(f"⚠️ No data for {ticker}")
+            st.warning(f"⚠️ No data returned for {ticker_fixed}")
             return None
 
-        # Fix possible 2D array issues
-        df["Close"] = df["Close"].squeeze()
 
-        # Compute indicators
-        try:
-            df = compute_indicators(df)
-        except Exception as e:
-            st.error(f"⚠️ Error computing indicators for {ticker}: {e}")
-            return None
+        # Ensure 1D arrays
+        if isinstance(df["Close"].values[0], (list, tuple)) or hasattr(df["Close"].values[0], "__len__"):
+            df["Close"] = df["Close"].squeeze()
 
+        df = compute_indicators(df)
         latest = df.iloc[-1]
 
         Price = latest["Close"]
         RSI = latest["RSI"]
         MA50 = latest["MA50"]
         MA200 = latest["MA200"]
+        EMA20 = latest["EMA20"]
         MACD = latest["MACD"]
         MACD_Signal = latest["MACD_Signal"]
 
@@ -135,14 +133,15 @@ def analyze_stock(ticker, rules):
             "RSI": round(RSI, 2),
             "MA50": round(MA50, 2),
             "MA200": round(MA200, 2),
+            "EMA20": round(EMA20, 2),
             "MACD": round(MACD, 2),
             "MACD_Signal": round(MACD_Signal, 2),
             "Signal": signal,
-            "Link": f"https://finance.yahoo.com/quote/{ticker}"
+            "Link": f"https://finance.yahoo.com/quote/{ticker_fixed}"
         }
 
     except Exception as e:
-        st.error(f"Error analyzing {ticker}: {e}")
+        st.error(f"❌ Error analyzing {ticker_fixed}: {e}")
         return None
 
 
@@ -193,94 +192,91 @@ import time
 
 FAILED_LOG = "failed_tickers.txt"
 
-# --- Initialize session state safely ---
-if "analyzed_data" not in st.session_state:
-    st.session_state["analyzed_data"] = pd.DataFrame()
-if "selected_watchlist" not in st.session_state:
-    st.session_state["selected_watchlist"] = None
-
 # ----- Analyze stocks -----
 if st.button("🔍 Analyze Watchlist"):
-    st.session_state["analyzed_data"] = pd.DataFrame()  # Reset
-    st.session_state["selected_watchlist"] = selected_watchlist
-
     st.subheader(f"📊 Analyzing Watchlist: {selected_watchlist}")
     results = []
-    for ticker in load_watchlist(selected_watchlist):
-        res = analyze_stock(ticker, load_rules())
+    for ticker in symbols:
+        res = analyze_stock(ticker, rules)
         if res:
             results.append(res)
         else:
             st.warning(f"⚠️ Could not analyze {ticker}")
 
     if results:
-        st.session_state["analyzed_data"] = pd.DataFrame(results)
+        df = pd.DataFrame(results)
+
+        # Format numbers
+        df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
+        for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
+            df[col] = df[col].apply(lambda x: f"{x:.2f}")
+
+        # Move Yahoo link to last column
+        df["Yahoo Link"] = df["Link"].apply(lambda l: f"[Open]({l})")
+        df = df.drop(columns=["Link"])
+
+        # Reorder columns for readability
+        df = df[
+            ["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
+        ]
+
+        # Apply signal colors
+        def color_signal(val):
+            if "BUY" in val:
+                return "background-color: #d4edda; color: green; font-weight: bold"
+            elif "SELL" in val:
+                return "background-color: #f8d7da; color: red; font-weight: bold"
+            else:
+                return "background-color: #f0f0f0; color: gray"
+
+        styled = (
+            df.style
+            .applymap(color_signal, subset=["Signal"])
+            .set_properties(
+                **{
+                    "text-align": "center",
+                    "border": "1px solid #ddd",
+                    "padding": "6px",
+                }
+            )
+        )
+
+        st.markdown("### 📋 Analysis Results")
+        st.dataframe(df, use_container_width=True)
+
+        # --- Interactive Chart Section ---
+        st.markdown("---")
+        st.subheader("📈 View Stock Chart")
+
+        selected_ticker = st.selectbox("Choose a stock to view chart:", df["Ticker"].tolist())
+
+        if selected_ticker:
+
+            data = yf.download(selected_ticker, period="1y", progress=False)
+            if not data.empty:
+                # Compute indicators for chart
+                data["MA50"] = data["Close"].rolling(window=50).mean()
+                data["MA200"] = data["Close"].rolling(window=200).mean()
+
+                st.markdown(f"### {selected_ticker} — Price with MA50 / MA200")
+                fig, ax = plt.subplots(figsize=(10, 4))
+                ax.plot(data.index, data["Close"], label="Close", linewidth=1.8)
+                ax.plot(data.index, data["MA50"], label="MA50", linestyle="--")
+                ax.plot(data.index, data["MA200"], label="MA200", linestyle=":")
+                ax.set_title(f"{selected_ticker} Price Trend")
+                ax.legend()
+                ax.grid(True)
+                st.pyplot(fig)
+
+                st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
+
+            else:
+                st.warning("⚠️ No price data found for selected ticker.")
     else:
         st.info("No valid data to display.")
-
-# --- Display cached results ---
-if not st.session_state["analyzed_data"].empty:
-    df = st.session_state["analyzed_data"].copy()
-
-    # Format columns
-    df["Price"] = df["Price"].apply(lambda x: f"${x:,.2f}")
-    for col in ["RSI", "MA50", "MA200", "MACD", "MACD_Signal"]:
-        df[col] = df[col].apply(lambda x: f"{x:.2f}")
-    df["Yahoo Link"] = df["Link"].apply(lambda l: f"[Open]({l})")
-    df = df.drop(columns=["Link"])
-
-    df = df[
-        ["Ticker", "Price", "RSI", "MA50", "MA200", "MACD", "MACD_Signal", "Signal", "Yahoo Link"]
-    ]
-
-    # Color signals
-    def color_signal(val):
-        if "BUY" in val:
-            return "background-color: #d4edda; color: green; font-weight: bold"
-        elif "SELL" in val:
-            return "background-color: #f8d7da; color: red; font-weight: bold"
-        else:
-            return "background-color: #f0f0f0; color: gray"
-
-    st.markdown("### 📋 Analysis Results")
-    st.dataframe(
-        df.style.applymap(color_signal, subset=["Signal"]),
-        use_container_width=True
-    )
-
-    # --- Chart section ---
-    st.markdown("---")
-    st.subheader("📈 View Stock Chart")
-
-    selected_ticker = st.selectbox(
-        "Choose a stock to view chart:",
-        df["Ticker"].tolist(),
-        key="chart_select"
-    )
-
-    if selected_ticker:
-        import matplotlib.pyplot as plt
-
-        data = yf.download(selected_ticker, period="1y", progress=False)
-        if not data.empty:
-            data["MA50"] = data["Close"].rolling(window=50).mean()
-            data["MA200"] = data["Close"].rolling(window=200).mean()
-
-            st.markdown(f"### {selected_ticker} — Price with MA50 / MA200")
-            fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(data.index, data["Close"], label="Close", linewidth=1.8)
-            ax.plot(data.index, data["MA50"], label="MA50", linestyle="--")
-            ax.plot(data.index, data["MA200"], label="MA200", linestyle=":")
-            ax.set_title(f"{selected_ticker} Price Trend")
-            ax.legend()
-            ax.grid(True)
-            st.pyplot(fig)
-
-            st.markdown(f"[🔗 View on Yahoo Finance](https://finance.yahoo.com/quote/{selected_ticker})")
 else:
     st.info("Select a watchlist and click 'Analyze Watchlist' to begin.")
 
-    
 with st.expander("📘 Indicator Descriptions"):
     st.markdown("""
     **RSI (Relative Strength Index):** Measures momentum — below 30 may signal oversold (buy), above 70 overbought (sell).  
